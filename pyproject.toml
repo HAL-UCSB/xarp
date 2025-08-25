@@ -1,0 +1,24 @@
+[project]
+name = "xarp"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi[standard]>=0.115.12",
+    "huggingface-hub[mcp]>=0.32.2",
+    "mcp[cli]>=1.9.1",
+    "openai>=1.82.0",
+    "pydantic-settings>=2.9.1",
+    "scipy>=1.16.0",
+    "smolagents[mcp,openai]>=1.17.0",
+    "streamlit>=1.46.0",
+    "websockets>=15.0.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+
+[project.scripts]
+xarp = "xarp.__main__:main"
