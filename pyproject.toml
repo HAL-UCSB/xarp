@@ -1,0 +1,25 @@
+[project]
+name = "xarp"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "caetanolab", email = "152355265+caetanolab@users.noreply.github.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.119.1",
+    "mcp[cli]>=1.18.0",
+    "pandas>=2.3.3",
+    "pydantic-settings>=2.11.0",
+    "standard-imghdr>=3.13.0",
+    "streamlit>=1.50.0",
+    "uvicorn[standard]>=0.38.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+web = "xarp.web:run"

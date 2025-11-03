@@ -1,0 +1,14 @@
+XARP
+Copyright 2025 UCSB Human-AI Experience Lab
+
+This product includes software developed at
+the UCSB Human–AI Experience Lab (https://sites.cs.ucsb.edu/~sra/).
+
+If you use this software in published research, please cite:
+
+@article{caetano2025xarp,
+  title   = {XARP: A Human-First and AI Agent-Ready Extended Reality Toolkit},
+  author  = {Caetano, Arthur and Kumaran, Radha and Jou, Kelvin and Höllerer, Tobias and Sra, Misha},
+  journal = {arXiv preprint arXiv:2508.04108},
+  year    = {2025}
+}
