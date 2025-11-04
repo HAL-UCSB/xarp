@@ -3,7 +3,7 @@ import base64
 import pathlib
 from asyncio import AbstractEventLoop
 from functools import partial
-from typing import Callable, Any
+from typing import Callable, Any, Tuple
 
 import uvicorn
 from PIL import Image
@@ -128,8 +128,8 @@ class AsyncXR:
 
     async def hands(self) -> Hands:
         await self._send_command('hands')
-        model_dict = await self.ws.receive_json()
-        model = Hands.model_validate(model_dict)
+        left, right = await self.ws.receive_json()
+        model = Hands.model_validate(dict(left=left, right=right))
         if self._chat_log:
             model_json = model.model_dump_json()
             chat_message = ChatMessage.from_user('hands', model_json)

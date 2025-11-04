@@ -23,7 +23,7 @@ def render_file_preview(path: pathlib.PurePath):
     extension = path.suffix[1:]
     if extension in ('png', 'jpg', 'jpeg'):
         with open(path.as_posix(), 'rb') as f:
-            st.image(f.read(), use_container_width=True)
+            st.image(f.read(), width='stretch')
     elif extension == 'json':
         with open(path) as f:
             st.json(f.read())

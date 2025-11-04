@@ -358,6 +358,11 @@ class Transform(BaseModel):
         return self.rotation.tolist()
 
 
+def centroid(transforms: Iterable[Transform]):
+    positions = [t.position for t in transforms]
+    return np.array(positions).mean(axis=0)
+
+
 # ---- Tests ------------------------------------------
 if __name__ == '__main__':
     T_id = Transform.identity()

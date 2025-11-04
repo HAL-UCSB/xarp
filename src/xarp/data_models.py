@@ -35,7 +35,7 @@ class ChatMessage(BaseModel):
         return cls(
             role=cls.user,
             content=ChatMessageContent(
-                text=list(text),
+                text=list(filter(lambda s: s is not None, text)),
                 files=files))
 
     @classmethod
@@ -45,7 +45,7 @@ class ChatMessage(BaseModel):
         return cls(
             role=cls.assistant,
             content=ChatMessageContent(
-                text=list(text),
+                text=list(filter(lambda s: s is not None, text)),
                 files=files))
 
     @classmethod
@@ -55,7 +55,7 @@ class ChatMessage(BaseModel):
         return cls(
             role=cls.system,
             content=ChatMessageContent(
-                text=list(text),
+                text=list(filter(lambda s: s is not None, text)),
                 files=files))
 
 
@@ -78,16 +78,5 @@ class XRCommand(BaseModel):
 
 
 class Hands(BaseModel):
-    left: List[Transform] = Field(default_factory=list)
-    right: List[Transform] = Field(default_factory=list)
-
-    @staticmethod
-    def _centroid(hand: List[Transform]) -> FloatArrayLike:
-        joint_positions = np.array([joint.position for joint in hand])
-        return np.mean(joint_positions, axis=0)
-
-    def left_centroid(self) -> FloatArrayLike:
-        return self._centroid(self.left)
-
-    def right_centroid(self) -> FloatArrayLike:
-        return self._centroid(self.right)
+    left: Tuple[Transform, ...] = Field(default_factory=tuple)
+    right: Tuple[Transform, ...] = Field(default_factory=tuple)
