@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import ClassVar, List, Dict, Tuple, Any
 
 from pydantic import BaseModel, Field
+from fastapi import WebSocket
 
 from xarp.spatial import Transform, FloatArrayLike
 
@@ -14,7 +15,6 @@ def utc_ts():
 
 
 class ChatMessageContent(BaseModel):
-    ts: int = Field(default_factory=utc_ts)
     text: List[str] = Field(default_factory=list)
     files: List[pathlib.PurePath] = Field(default_factory=list)
 
@@ -68,13 +68,6 @@ class Session(BaseModel):
 class User(BaseModel):
     user_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     sessions: List[Session] = Field(default_factory=list)
-
-
-class XRCommand(BaseModel):
-    ts: int = Field(default_factory=utc_ts)
-    cmd: str
-    args: Tuple[Any, ...] = Field(default_factory=tuple)
-    kwargs: Dict[Any, Any] = Field(default_factory=dict)
 
 
 class Hands(BaseModel):

@@ -16,12 +16,9 @@ from xarp.xr import XR, run_app, settings
 
 
 def playback_app(xr: XR):
-    # Don't log data
-    xr.chat_log = False
-
     # load session
     sessions = SessionRepositoryLocalFileSystem(settings.local_storage)
-    session = sessions.get('foo', 1762233779)
+    session = sessions.get('foo', 1762397243)
 
     # cache command calls with the session data
     cmds = []
@@ -48,9 +45,9 @@ def playback_app(xr: XR):
             case 'image':
                 img_path = message.content.files[0].as_posix()
                 img_path = urlparse(img_path)
-                img = Image.open(img_path.path[1:])
+                img = Image.open(img_path.path)
                 width, height = img.size
-                scale = .25
+                scale = .2
                 img.thumbnail((int(width * scale), int(height * scale)))
                 buffer = io.BytesIO()
                 img.save(buffer, format='PNG')
@@ -58,20 +55,20 @@ def playback_app(xr: XR):
                 encoded_img = base64.b64encode(png_bytes).decode('ascii')
 
         # prepare a command when we gather eye, hands, and image
-        if None not in (eye, hands, encoded_img):
+        if None not in (eye, encoded_img):
             if hands.left and hands.right:
                 partial_cmd = partial(
-                    xr.display_eye,
+                    xr.display,
                     encoded_img,
                     width,
                     height,
+                    .4,
                     eye=eye)
                 cmds.append(partial_cmd)
                 centroids = (
                     centroid(hands.left) if hands.left else None,
                     centroid(hands.right) if hands.right else None,
                 )
-                centroids = centroid(hands.left), centroid(hands.right)
                 gt_hand_centroids.append(centroids)
             eye, hands, encoded_img = None, None, None
 
@@ -81,27 +78,14 @@ def playback_app(xr: XR):
 
         while True:
             error = np.inf
-            while error > .2:
+
+            while i_right is not None and error > .1:
                 hands = xr.hands()
-
-                if hands.left and i_left is not None:
-                    xr.sphere(i_left, scale=.05, color=(1, 0, 0, 1), key='_left')
-                    left = centroid(hands.left)
-                    left_error = np.linalg.norm(left - i_left) / .8
-                else:
-                    left_error = 0
-
-
-                if hands.right and i_right is not None:
-                    xr.sphere(i_right, scale=.05, color=(0, 1, 0, 1), key='_right')
+                if hands.right:
                     right = centroid(hands.right)
-                    right_error = np.linalg.norm(right - i_right) / .8
-                else:
-                    right_error = 0
-
-                error = np.max([left_error, right_error])
-
-                i_cmd(opacity=np.max((error, .75)))
+                    error = np.linalg.norm(right - i_right) / .8
+                i_cmd(opacity=np.max((error, .25)))
+                xr.sphere(i_right, scale=.025, color=(1, 1, 1, 1), key='_right')
 
             i_cmd, (i_left, i_right) = next(frames)
 
