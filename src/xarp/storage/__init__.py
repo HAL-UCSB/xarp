@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Generator, Optional
 
-from xarp.data_models import Session, User
+from xarp.data_models.entities import Session, User
 
 
 class SessionRepository(ABC):

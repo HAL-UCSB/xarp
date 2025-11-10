@@ -363,8 +363,8 @@ def centroid(transforms: Iterable[Transform]):
     return np.array(positions).mean(axis=0)
 
 
-# ---- Tests ------------------------------------------
 if __name__ == '__main__':
+    '''Tests'''
     T_id = Transform.identity()
     assert np.allclose(T_id.matrix(), np.eye(4))
 

@@ -12,6 +12,7 @@ dependencies = [
     "mcp[cli]>=1.18.0",
     "pandas>=2.3.3",
     "pydantic-settings>=2.11.0",
+    "pyinstrument>=5.1.1",
     "standard-imghdr>=3.13.0",
     "streamlit>=1.50.0",
     "uvicorn[standard]>=0.38.0",

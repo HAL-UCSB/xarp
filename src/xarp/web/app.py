@@ -1,5 +1,4 @@
 import base64
-import base64
 import json
 import threading
 from functools import partial
@@ -13,7 +12,7 @@ from websockets import WebSocketException
 from websockets.sync.client import connect
 
 from xarp.data_models import ChatMessage
-from xarp.spatial import Transform
+from xarp.data_models.spatial import Transform
 from xarp.storage.local_file_system import UserRepositoryLocalFileSystem
 from xarp.web.chat_ui import render_chat_messages, require_session_obj
 from xarp.xr import XRCommand, settings

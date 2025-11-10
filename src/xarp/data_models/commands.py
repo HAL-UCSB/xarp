@@ -1,11 +1,10 @@
-import base64
-from typing import Any, List, Dict, ClassVar
+from typing import Any, List, Dict, ClassVar, Callable, Annotated
 
-from PIL import Image
 from pydantic import BaseModel, Field
 
-from xarp.data_models import Hands, utc_ts
-from xarp.spatial import Transform, FloatArrayLike
+from xarp.data_models.app import Hands, Image
+from xarp.time import utc_ts
+from xarp.data_models.spatial import Transform, FloatArrayLike
 
 
 class XRCommand(BaseModel):
@@ -30,8 +29,9 @@ class WriteCommand(XRCommand):
     def __init__(self,
                  *text,
                  title=None,
-                 key=None):
-        super().__init__()
+                 key=None,
+                 **kwargs):
+        super().__init__(**kwargs)
         self.args = list(text)
         if title:
             self.kwargs['title'] = title or ''
@@ -49,28 +49,28 @@ class ReadCommand(WriteCommand):
 
 class ImageCommand(XRCommand):
     cmd: str = 'image'
-    pil_img_mode: str = 'RGBA'
+    pil_img_mode: ClassVar[str] = 'RGBA'
     _cmd: ClassVar[str] = 'image'
 
     def result(self, image_dict: dict) -> Image:
-        pixels = base64.b64decode(image_dict['pixels'])
-        size = image_dict['width'], image_dict['height']
-        img = Image.frombytes(self.pil_img_mode, size, pixels)
-        return img.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+        return Image(**image_dict, pil_img_mode=ImageCommand.pil_img_mode)
 
 
 class DepthCommand(ImageCommand):
     cmd: str = 'depth'
-    pil_img_mode: str = 'I;16'
+    pil_img_mode: ClassVar[str] = 'I;16'
     _cmd: ClassVar[str] = 'depth'
+
+    def result(self, image_dict: dict) -> Image:
+        return Image(**image_dict, pil_img_mode=DepthCommand.pil_img_mode)
 
 
 class EyeCommand(XRCommand):
     cmd: str = 'eye'
     _cmd: ClassVar[str] = 'eye'
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def result(self, data: dict) -> Transform:
         return Transform.model_validate(data)
@@ -87,8 +87,9 @@ class DisplayCommand(XRCommand):
                  depth: float,
                  opacity: float = 1.0,
                  eye: Transform = None,
-                 key: str = None):
-        super().__init__()
+                 key: str = None,
+                 **kwargs):
+        super().__init__(**kwargs)
         self.args = [content, width, height, depth]
         if opacity:
             self.kwargs['opacity'] = opacity
@@ -102,8 +103,8 @@ class HandsCommand(XRCommand):
     cmd: str = 'hands'
     _cmd: ClassVar[str] = 'hands'
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def result(self, data: dict) -> Hands:
         return Hands.model_validate(data)
@@ -131,25 +132,12 @@ class XRCommandBundle(XRCommand):
     cmd: str = 'bundle'
     _cmd: ClassVar[str] = 'bundle'
 
-    def image(self) -> None:
-        self.args.append(ImageCommand())
-
-    def depth(self) -> None:
-        self.args.append(DepthCommand())
-
-    def eye(self) -> None:
-        self.args.append(EyeCommand())
-
-    def hands(self) -> None:
-        self.args.append(HandsCommand())
+    bundle_map: ClassVar[Dict[str, Callable]] = {
+        EyeCommand._cmd: EyeCommand,
+        HandsCommand._cmd: HandsCommand,
+        ImageCommand._cmd: ImageCommand,
+        DepthCommand._cmd: DepthCommand
+    }
 
     def result(self, results: List) -> List:
         return [command.result(result) for command, result in zip(self.args, results)]
-
-
-bundle_map = {
-    EyeCommand._cmd: EyeCommand,
-    HandsCommand._cmd: HandsCommand,
-    ImageCommand._cmd: ImageCommand,
-    DepthCommand._cmd: DepthCommand
-}
