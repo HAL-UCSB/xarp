@@ -49,12 +49,15 @@ class SessionRepositoryLocalFileSystem(SessionRepository):
         chat_path = session_path / 'chat.json'
         files_path = session_path / 'files'
         files_path.mkdir(parents=True, exist_ok=True)
+
+        i = 0
         for chat_message in session.chat:
             if chat_message.mimetype == 'application/xarp/image' and isinstance(chat_message.content, str):
                 img = Image.model_validate_json(chat_message.content)
-                img_path = files_path / f'{chat_message.ts}.png'
-                img.dump_to_image_file(img_path)
+                img_path = files_path / f'{i}.png'
+                img.dump_pixels(img_path)
                 chat_message.content = img.model_dump_json()
+                i += 1
 
         with chat_path.open('w', encoding='utf-8') as f:
             f.write(session.model_dump_json())

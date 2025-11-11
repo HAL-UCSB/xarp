@@ -1,11 +1,10 @@
 import asyncio
-import pathlib
 from asyncio import AbstractEventLoop
 from functools import partial
 from typing import Callable, Any, List, Union
+import base64
 
 import uvicorn
-from PIL import Image
 from fastapi import FastAPI, WebSocket, HTTPException
 from mcp.server.fastmcp import FastMCP
 
@@ -14,12 +13,12 @@ from xarp.auth import settings_file_authorization
 from xarp.data_models import model_cls_to_mimetype
 from xarp.data_models.chat import ChatMessage
 from xarp.data_models.entities import Session
-from xarp.data_models.app import Hands
+from xarp.data_models.app import Hands, Image
 from xarp.data_models.spatial import Transform, FloatArrayLike
 from xarp.storage import SessionRepository
 from xarp.storage.local_file_system import SessionRepositoryLocalFileSystem
 from xarp.data_models.commands import XRCommand, XRCommandBundle, ClearCommand, WriteCommand, ReadCommand, \
-    ImageCommand, DepthCommand, EyeCommand, DisplayCommand, HandsCommand, SphereCommand
+    ImageCommand, DepthCommand, EyeCommand, DisplayCommand, HandsCommand, SphereCommand, Bundlable
 
 
 class AsyncXR:
@@ -30,40 +29,54 @@ class AsyncXR:
         self.ws = ws
         self.session = session
         self.logs = []
+        self.log_chat = False
 
     async def _execute(self, command_type, *args, **kwargs) -> Any:
         # skip null keywords
-        kwargs = {k: v for k, v in kwargs.items() if v}
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
 
         # XR Command from server
         command = command_type(*args, **kwargs)
         command_json = command.model_dump_json()
-        await self.ws.send_json(command_json)
+        if self.log_chat:
+            self._log_command(command)
+        await self.ws.send_text(command_json)
 
         # Log and return result from client
-        result_json = await self.ws.receive_json()
+        result_json = await self.ws.receive_text()
         result = command.result(result_json)
-        self._log_to_chat(command, result)
+        if self.log_chat:
+            self._log_result(result)
         return result
 
-    def _log_to_chat(self, command: XRCommand, result: Any) -> None:
+    def _log_command(self, command: XRCommand):
         # flatten bundle
         if isinstance(command, XRCommandBundle):
-            for subcommand, subresult in zip(command.args, result):
-                self._log_to_chat(subcommand, subresult)
+            for subcommand in command.args:
+                self._log_command(subcommand)
             return
 
         command_message = ChatMessage.from_system(
             command.model_dump_json(),
             mimetype=model_cls_to_mimetype[type(command)])
         self.session.chat.append(command_message)
-        if result:
-            result_message = ChatMessage.from_user(
-                result.model_dump_json(),
-                mimetype=model_cls_to_mimetype[type(result)])
-            self.session.chat.append(result_message)
 
-    async def bundle(self, *cmds: Union[XRCommand, Callable, str]) -> List:
+    def _log_result(self, result: Any) -> None:
+        if result is None:
+            return
+
+        # flatten bundle result
+        if isinstance(result, list):
+            for sub_result in result:
+                self._log_result(sub_result)
+            return
+
+        result_message = ChatMessage.from_user(
+            result.model_dump_json(),
+            mimetype=model_cls_to_mimetype[type(result)])
+        self.session.chat.append(result_message)
+
+    async def bundle(self, *cmds: Union[XRCommand, Callable, str]) -> Bundlable:
         if not cmds:
             return []
         args = []
@@ -71,7 +84,7 @@ class AsyncXR:
             if type(cmd) is XRCommand:
                 args.append(cmd)
             else:
-                # syntactic sugar
+                # syntactic sugar: allow bundle(xr.image, xr.depth) instead of bundle('image', 'depth')
                 if callable(cmd):
                     cmd = cmd.__name__
                 cmd_type = XRCommandBundle.bundle_map[cmd]
@@ -104,14 +117,14 @@ class AsyncXR:
         return result
 
     async def display(self,
-                      content: bytes,
-                      width: int,
-                      height: int,
-                      depth: float,
+                      image: Image = None,
+                      depth: float = None,
                       opacity: float = 1.0,
                       eye=None,
+                      visible=True,
                       key=None) -> None:
-        await self._execute(DisplayCommand, content, width, height, depth, opacity=opacity, eye=eye, key=key)
+        await self._execute(DisplayCommand, image=image, depth=depth, opacity=opacity, eye=eye, visible=visible,
+                            key=key)
 
     async def hands(self) -> Hands:
         return await self._execute(HandsCommand)
@@ -149,7 +162,7 @@ class XR(AsyncXR):
         future = asyncio.run_coroutine_threadsafe(coro, self._loop)
         return future.result()
 
-    def bundle(self, *cmds: Union[Callable, str]) -> List:
+    def bundle(self, *cmds: Union[Callable, str]) -> Bundlable:
         return self._sync(super().bundle, *cmds)
 
     def clear(self):
@@ -170,9 +183,14 @@ class XR(AsyncXR):
     def eye(self) -> Transform:
         return self._sync(super().eye)
 
-    def display(self, content: bytes, width: int, height: int, depth: float, opacity: float = 1.0, eye=None,
+    def display(self,
+                image: Image = None,
+                depth: float = None,
+                opacity: float = 1.0,
+                eye=None,
+                visible=True,
                 key=None) -> None:
-        self._sync(super().display, content, width, height, depth, opacity=opacity, eye=eye, key=key)
+        self._sync(super().display, image=image, depth=depth, opacity=opacity, eye=eye, visible=visible, key=key)
 
     def hands(self) -> Hands:
         return self._sync(super().hands)

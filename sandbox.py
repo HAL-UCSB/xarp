@@ -1,10 +1,12 @@
 from time import sleep
 
 from xarp.storage.local_file_system import SessionRepositoryLocalFileSystem
-from xarp.xr import XR, run_app
+from xarp import XR, run_xr_app
 
 
 def sandbox(xr: XR):
+    foo = xr.image()
+    foo.as_pil_image().show()
     position = [0] * 3
     for i in range(1):
         xr.write(f'hello {i}')
@@ -29,6 +31,6 @@ def sandbox(xr: XR):
 
 
 if __name__ == '__main__':
-    run_app(
+    run_xr_app(
         sandbox,
         SessionRepositoryLocalFileSystem)

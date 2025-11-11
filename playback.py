@@ -1,125 +1,107 @@
 import base64
 import io
-import json
 from functools import partial
-from time import sleep
-from typing import Iterable
 from urllib.parse import urlparse
 
 import numpy as np
-from PIL import Image
 
-from xarp.data_models import ChatMessage, Hands
-from xarp.spatial import Transform, centroid
+from xarp import XR, run_xr_app, settings, Hands
+from xarp.data_models.app import Image
+from xarp.data_models.chat import ChatMessage
+from xarp.data_models.spatial import centroid
 from xarp.storage.local_file_system import SessionRepositoryLocalFileSystem
-from xarp.xr import XR, run_app, settings
+
+RED = 1, 0, 0, 1
+GREEN = 0, 1, 0, 1
+BLUE = 0, 0, 1, 1
 
 
 def playback_app(xr: XR):
+    xr.write('Loading Demonstration')
+    xr.hands()
+
     # load session
     sessions = SessionRepositoryLocalFileSystem(settings.local_storage)
-    session = sessions.get('foo', 1762397243)
+    session = sessions.get('foo', 1762879449)
 
-    # cache command calls with the session data
-    cmds = []
-    gt_hand_centroids = []
-    eye, hands, encoded_img = None, None, None
+    chat = sorted(session.chat, key=lambda msg: msg.ts)
 
-    chat = sorted(session.chat, key=lambda message: message.ts)
+    eyes = [message.content for message in chat if message.mimetype == 'application/xarp/transform']
 
+    centroid_pairs = []
     for message in chat:
-
-        if message.role != ChatMessage.user:
+        if message.mimetype != 'application/xarp/hands':
             continue
+        hands: Hands = message.content
+        pair = (
+            centroid(hands.left) if hands.left else None,
+            centroid(hands.right) if hands.right else None)
+        centroid_pairs.append(pair)
 
-        cmd = message.content.text[0]
-        match cmd:
-            case 'eye':
-                str_data = message.content.text[1]
-                model_dict = json.loads(str_data)
-                eye = Transform.model_validate(model_dict)
-            case 'hands':
-                str_data = message.content.text[1]
-                model_dict = json.loads(str_data)
-                hands = Hands.model_validate(model_dict)
-            case 'image':
-                img_path = message.content.files[0].as_posix()
-                img_path = urlparse(img_path)
-                img = Image.open(img_path.path)
-                width, height = img.size
-                scale = .2
-                img.thumbnail((int(width * scale), int(height * scale)))
-                buffer = io.BytesIO()
-                img.save(buffer, format='PNG')
-                png_bytes = buffer.getvalue()
-                encoded_img = base64.b64encode(png_bytes).decode('ascii')
-
-        # prepare a command when we gather eye, hands, and image
-        if None not in (eye, encoded_img):
-            if hands.left and hands.right:
-                partial_cmd = partial(
-                    xr.display,
-                    encoded_img,
-                    width,
-                    height,
-                    .4,
-                    eye=eye)
-                cmds.append(partial_cmd)
-                centroids = (
-                    centroid(hands.left) if hands.left else None,
-                    centroid(hands.right) if hands.right else None,
-                )
-                gt_hand_centroids.append(centroids)
-            eye, hands, encoded_img = None, None, None
+    image_keys = []
+    i = 0
+    for message in chat:
+        if message.mimetype != 'application/xarp/image':
+            continue
+        image: Image = message.content
+        image.load_pixels()
+        key = f'frame_{i}'
+        i += 1
+        # transfer the frame to the client to save time but keep it hidden
+        xr.display(image=image, visible=False, key=key)
+        image_keys.append(key)
+        xr.write(f'Loading {i}')
 
     while True:
-        frames = iter(zip(cmds, gt_hand_centroids))
-        i_cmd, (i_left, i_right) = next(frames)
+        frames = iter(zip(image_keys, centroid_pairs, eyes))
+        image_key, (left_centroid, right_centroid), eye = next(frames)
+        j = 0
 
-        while True:
+        while j < i - 1:
+
             error = np.inf
-
-            while i_right is not None and error > .1:
+            while error > 0.1:
                 hands = xr.hands()
-                if hands.right:
-                    right = centroid(hands.right)
-                    error = np.linalg.norm(right - i_right) / .8
-                i_cmd(opacity=np.max((error, .25)))
-                xr.sphere(i_right, scale=.025, color=(1, 1, 1, 1), key='_right')
 
-            i_cmd, (i_left, i_right) = next(frames)
+                if left_centroid is not None:
+                    if hands.left:
+                        i_left_centroid = centroid(hands.left)
+                        left_error = np.linalg.norm(left_centroid - i_left_centroid)
+                        xr.sphere(left_centroid, scale=.025, color=RED, key='_left')
+                    else:
+                        left_error = np.inf
+                else:
+                    left_error = -np.inf
 
+                if right_centroid is not None:
+                    if hands.right:
+                        i_right_centroid = centroid(hands.right)
+                        right_error = np.linalg.norm(right_centroid - i_right_centroid)
+                        xr.sphere(right_centroid, scale=.025, color=RED, key='_right')
+                    else:
+                        right_error = np.inf
+                else:
+                    right_error = -np.inf
 
-# img = Image.open(r'C:\Users\Arthur\PycharmProjects\xarp\data\foo\1761899811\files\2426695927920.png')
-# width, height = img.size
-# scale = .2
-# img.thumbnail((int(width * scale), int(height * scale)))
-# while True:
-#     img = xr.image()
-#     width, height = img.size
-#     scale = .2
-#     img.thumbnail((int(width * scale), int(height * scale)))
-#     buffer = io.BytesIO()
-#     img.save(buffer, format='PNG')
-#     png_bytes = buffer.getvalue()
-#     encoded = base64.b64encode(png_bytes).decode('ascii')
-#     eye = xr.eye()
-#     xr.display_eye(encoded, width, height, transparency=alpha, eye=eye)
-#
-# depth = .425
-# while True:
-#     img = xr.image()
-#     width, height = img.size
-#     scale = .1
-#     img.thumbnail((int(width * scale), int(height * scale)))
-#     buffer = io.BytesIO()
-#     img.save(buffer, format='PNG')
-#     png_bytes = buffer.getvalue()
-#     encoded = base64.b64encode(png_bytes).decode("ascii")
-#     xr.display(encoded, width, height, depth)
+                error = np.max([left_error, right_error])
+
+                xr.display(
+                    opacity=np.max([error, .25]),
+                    visible=True,
+                    eye=eye,
+                    key=image_key)
+
+            # frame cleared
+            xr.display(
+                visible=False,
+                key=image_key)
+
+            # next frame
+            image_key, (left_centroid, right_centroid), eye = next(frames)
+            j += 1
 
 
 if __name__ == '__main__':
-    run_app(
+    run_xr_app(
         playback_app,
         SessionRepositoryLocalFileSystem)
