@@ -1,8 +1,7 @@
 import asyncio
 from asyncio import AbstractEventLoop
 from functools import partial
-from typing import Callable, Any, List, Union
-import base64
+from typing import Callable, Any, List, Union, Awaitable
 
 import uvicorn
 from fastapi import FastAPI, WebSocket, HTTPException
@@ -118,8 +117,8 @@ class AsyncXR:
 
     async def display(self,
                       image: Image = None,
-                      depth: float = None,
-                      opacity: float = 1.0,
+                      depth: float = .2,
+                      opacity: float = 1,
                       eye=None,
                       visible=True,
                       key=None) -> None:
@@ -185,8 +184,8 @@ class XR(AsyncXR):
 
     def display(self,
                 image: Image = None,
-                depth: float = None,
-                opacity: float = 1.0,
+                depth: float = .2,
+                opacity: float = 1,
                 eye=None,
                 visible=True,
                 key=None) -> None:
@@ -253,7 +252,9 @@ async def _websocket_entrypoint(
 
 
 def run_xr_app(
-        xr_app: Callable[[XR], None],
+        xr_app: Union[
+            Callable[[XR], None],
+            Callable[[AsyncXR], Awaitable]],
         auth: Callable[[str], bool] = None,
         session_repo: SessionRepository = None) -> None:
     """
@@ -271,11 +272,31 @@ def run_xr_app(
 
     app = FastAPI()
 
-    entrypoint = partial(
-        _websocket_entrypoint,
-        xr_app,
-        auth,
-        session_repo)
+    async def entrypoint(
+            ws: WebSocket,
+            user_id: str,
+            session_ts: int = None):
+        if not auth(user_id):
+            raise HTTPException(status_code=401, detail="User unauthorized")
+
+        session = None
+        if session_ts:
+            session = session_repo.get(user_id, session_ts)
+        if session is None:
+            session = Session(user_id=user_id)
+
+        await ws.accept()
+        await ws.send_text(str(session.ts))
+
+        if asyncio.iscoroutinefunction(xr_app):
+            xr = AsyncXR(ws, session)
+            await xr_app(xr)
+        else:
+            loop = asyncio.get_running_loop()
+            xr = XR(ws, loop, session)
+            await asyncio.to_thread(xr_app, xr)
+
+        await ws.close()
 
     app.add_api_websocket_route(
         settings.ws_route,

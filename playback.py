@@ -22,7 +22,7 @@ def playback_app(xr: XR):
 
     # load session
     sessions = SessionRepositoryLocalFileSystem(settings.local_storage)
-    session = sessions.get('foo', 1762879449)
+    session = sessions.get('foo', 1762963725)
 
     chat = sorted(session.chat, key=lambda msg: msg.ts)
 
@@ -71,7 +71,7 @@ def playback_app(xr: XR):
                     else:
                         left_error = np.inf
                 else:
-                    left_error = -np.inf
+                    left_error = 0
 
                 if right_centroid is not None:
                     if hands.right:
@@ -81,12 +81,12 @@ def playback_app(xr: XR):
                     else:
                         right_error = np.inf
                 else:
-                    right_error = -np.inf
+                    right_error = 0
 
                 error = np.max([left_error, right_error])
 
                 xr.display(
-                    opacity=np.max([error, .25]),
+                    opacity=np.max([error, .5]),
                     visible=True,
                     eye=eye,
                     key=image_key)

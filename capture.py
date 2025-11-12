@@ -7,20 +7,22 @@ from xarp.time import utc_ts
 def my_app(xr: XR):
     xr.log_chat = True
     xr.write('Start Recording')
+    i = 0
     now = utc_ts()
-    n = 10
-    for i in range(n):
-        print(i)
-        a, b, c = xr.bundle(
-            xr.image,
-            xr.hands,
-            xr.eye
-        )
-    print(n / (utc_ts() - now))
-    xr.write('Stop Recording')
+    try:
+        while True:
+            a, b, c = xr.bundle(
+                xr.image,
+                xr.hands,
+                xr.eye
+            )
+            print(i)
+            i += 1
+    finally:
+        print(i / (utc_ts() - now))
+        repo = SessionRepositoryLocalFileSystem(settings.local_storage)
+        repo.save(xr.session)
 
-    repo = SessionRepositoryLocalFileSystem(settings.local_storage)
-    repo.save(xr.session)
     while True:
         pass
 

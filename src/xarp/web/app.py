@@ -15,7 +15,7 @@ from xarp.data_models import ChatMessage
 from xarp.data_models.spatial import Transform
 from xarp.storage.local_file_system import UserRepositoryLocalFileSystem
 from xarp.web.chat_ui import render_chat_messages, require_session_obj
-from xarp.xr import XRCommand, settings
+from xarp import XRCommand, settings
 
 ws_key = 'ws'
 chat_key = 'chat'
