@@ -1,26 +1,28 @@
-import base64
-from typing import Any, List, Dict, ClassVar, Callable, Annotated, Union
+from typing import Any, List, Dict, ClassVar, Optional
 
-from pydantic import BaseModel, Field, TypeAdapter
+from pydantic import BaseModel, Field, JsonValue
 
-from xarp.data_models.app import Hands, Image
-from xarp.time import utc_ts
+from xarp.data_models.responses import Hands, Image, SenseResult
 from xarp.data_models.spatial import Transform, FloatArrayLike
+from xarp.time import utc_ts
 
 
 class XRCommand(BaseModel):
     ts: int = Field(default_factory=utc_ts)
+    xid: Optional[int] = None
     cmd: str
     args: List = Field(default_factory=list)
-    kwargs: Dict[Any, Any] = Field(default_factory=dict)
+    kwargs: Dict[str, Any] = Field(default_factory=dict)
 
-    def result(self, json_string: str) -> Any:
+    @classmethod
+    def validate_result(cls, json_data: Dict) -> Any:
         pass
 
-
-class ClearCommand(XRCommand):
-    cmd: str = 'clear'
-    _cmd: ClassVar[str] = 'clear'
+    @classmethod
+    def expects_response(cls) -> bool:
+        super_validate_result = XRCommand.__dict__['validate_result']
+        cls_validate_result = cls.__dict__.get('validate_result')
+        return cls_validate_result is not None and cls_validate_result is not super_validate_result
 
 
 class WriteCommand(XRCommand):
@@ -40,12 +42,30 @@ class WriteCommand(XRCommand):
             self.kwargs['key'] = key
 
 
+class SayCommand(WriteCommand):
+    cmd: str = 'say'
+    _cmd: ClassVar[str] = 'say'
+
+    def __init__(self,
+                 *text,
+                 title=None,
+                 key=None,
+                 **kwargs):
+        super().__init__(*text, title=title, key=key, **kwargs)
+
+    @classmethod
+    def validate_result(cls, json_data: Dict) -> Any:
+        # wait until said
+        pass
+
+
 class ReadCommand(WriteCommand):
     cmd: str = 'read'
     _cmd: ClassVar[str] = 'read'
 
-    def result(self, json_string: str) -> str:
-        return str(json_string)
+    @classmethod
+    def validate_result(cls, json_data: Dict) -> str:
+        return str(json_data)
 
 
 class ImageCommand(XRCommand):
@@ -53,8 +73,9 @@ class ImageCommand(XRCommand):
     pil_img_mode: ClassVar[str] = 'RGBA'
     _cmd: ClassVar[str] = 'image'
 
-    def result(self, json_string: str) -> Image:
-        img = Image.model_validate_json(json_string)
+    @classmethod
+    def validate_result(cls, json_data: Dict) -> Image:
+        img = Image.model_validate(json_data)
         img.pil_img_mode = ImageCommand.pil_img_mode
         return img
 
@@ -64,8 +85,9 @@ class DepthCommand(ImageCommand):
     pil_img_mode: ClassVar[str] = 'I;16'
     _cmd: ClassVar[str] = 'depth'
 
-    def result(self, json_string: str) -> Image:
-        img = Image.model_validate_json(json_string)
+    @classmethod
+    def validate_result(cls, json_data: Dict) -> Image:
+        img = Image.model_validate(json_data)
         img.pil_img_mode = DepthCommand.pil_img_mode
         return img
 
@@ -77,8 +99,70 @@ class EyeCommand(XRCommand):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def result(self, json_string: str) -> Transform:
-        return Transform.model_validate_json(json_string)
+    @classmethod
+    def validate_result(cls, json_data: Dict) -> Transform:
+        return Transform.model_validate(json_data)
+
+
+class HeadCommand(XRCommand):
+    cmd: str = 'head'
+    _cmd: ClassVar[str] = 'head'
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    @classmethod
+    def validate_result(cls, json_data: Dict) -> Transform:
+        return Transform.model_validate(json_data)
+
+
+class HandsCommand(XRCommand):
+    cmd: str = 'hands'
+    _cmd: ClassVar[str] = 'hands'
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    @classmethod
+    def validate_result(cls, json_data: Dict) -> Hands:
+        return Hands.model_validate(json_data)
+
+
+class SenseCommand(XRCommand):
+    cmd: str = 'sense'
+    _cmd: ClassVar[str] = 'sense'
+    _validation_map: ClassVar[Dict] = dict(
+        eye=EyeCommand,
+        head=HeadCommand,
+        image=ImageCommand,
+        depth=DepthCommand,
+        hands=HandsCommand)
+
+    def __init__(self, **kwargs):
+        super().__init__(kwargs=kwargs)
+
+    @classmethod
+    def validate_result(cls, json_data: Dict) -> SenseResult:
+        json_data = {k: cls._validation_map[k].validate_result(v) for k, v in json_data.items()}
+        return SenseResult.model_validate(json_data)
+
+
+class SphereCommand(XRCommand):
+    cmd: str = 'sphere'
+    _cmd: ClassVar[str] = 'sphere'
+
+    def __init__(self,
+                 position: FloatArrayLike,
+                 scale: float = .1,
+                 color: FloatArrayLike = (1, 1, 1, 1),
+                 key=None):
+        super().__init__(args=position)
+        if scale:
+            self.kwargs['scale'] = scale
+        if color:
+            self.kwargs['color'] = color
+        if key:
+            self.kwargs['key'] = key
 
 
 class DisplayCommand(XRCommand):
@@ -106,52 +190,34 @@ class DisplayCommand(XRCommand):
             ).items() if v is not None})
 
 
-class HandsCommand(XRCommand):
-    cmd: str = 'hands'
-    _cmd: ClassVar[str] = 'hands'
+class ClearCommand(XRCommand):
+    cmd: str = 'clear'
+    _cmd: ClassVar[str] = 'clear'
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+class SaveCommand(XRCommand):
+    cmd: str = 'save'
+    _cmd: ClassVar[str] = 'save'
 
-    def result(self, json_string: str) -> Hands:
-        return Hands.model_validate_json(json_string)
-
-
-class SphereCommand(XRCommand):
-    cmd: str = 'sphere'
-    _cmd: ClassVar[str] = 'sphere'
-
-    def __init__(self,
-                 position: FloatArrayLike,
-                 scale: float = .1,
-                 color: FloatArrayLike = (1, 1, 1, 1),
-                 key=None):
-        super().__init__(args=position)
-        if scale:
-            self.kwargs['scale'] = scale
-        if color:
-            self.kwargs['color'] = color
-        if key:
-            self.kwargs['key'] = key
+    def __init__(self, *args):
+        super().__init__(args=args)
 
 
-Bundlable = TypeAdapter(List[Union[
-    Transform,
-    Hands,
-    Image
-]])
+class LoadCommand(XRCommand):
+    cmd: str = 'load'
+    _cmd: ClassVar[str] = 'load'
+
+    def __init__(self, *args):
+        super().__init__(args=args)
 
 
-class XRCommandBundle(XRCommand):
+class BundleCommand(XRCommand):
     cmd: str = 'bundle'
     _cmd: ClassVar[str] = 'bundle'
 
-    bundle_map: ClassVar[Dict[str, Callable]] = {
-        EyeCommand._cmd: EyeCommand,
-        HandsCommand._cmd: HandsCommand,
-        ImageCommand._cmd: ImageCommand,
-        DepthCommand._cmd: DepthCommand
-    }
+    def __init__(self, **kwargs):
+        super().__init__(kwargs=kwargs)
 
-    def result(self, json_string: str) -> Bundlable:
-        return Bundlable.validate_json(json_string)
+class XRResult(BaseModel):
+    ts: int = Field(default_factory=utc_ts)
+    xid: Optional[int] = None
+    value: JsonValue

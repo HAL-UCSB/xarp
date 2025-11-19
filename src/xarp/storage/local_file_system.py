@@ -4,7 +4,7 @@ from typing import Generator, Optional
 
 from xarp.data_models import mimetype_to_model_cls
 from xarp.data_models.entities import Session, User
-from xarp.data_models.app import Image
+from xarp.data_models.responses import Image
 from xarp.storage import SessionRepository, UserRepository
 
 

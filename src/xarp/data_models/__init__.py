@@ -1,8 +1,8 @@
 from xarp.data_models.spatial import Transform
-from xarp.data_models.app import Hands, Image
+from xarp.data_models.responses import Hands, Image
 from xarp.data_models.chat import ChatMessage
 from xarp.data_models.commands import ClearCommand, WriteCommand, ReadCommand, ImageCommand, HandsCommand, \
-    SphereCommand, DepthCommand, EyeCommand, DisplayCommand, XRCommandBundle, XRCommand
+    SphereCommand, DepthCommand, EyeCommand, DisplayCommand, XRCommand
 
 __model_classes__ = [
     Hands,
@@ -18,7 +18,6 @@ __model_classes__ = [
     DisplayCommand,
     HandsCommand,
     SphereCommand,
-    XRCommandBundle,
     Transform
 ]
 

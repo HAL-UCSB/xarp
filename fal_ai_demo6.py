@@ -32,12 +32,14 @@ async def get_fal_ai_token(allowed_apps: List[str] = None, expiration: int = 500
 
 
 async def my_app(xr: AsyncXR):
-    width = 832
-    height = 480
+    width = 832  # width = 960#
+    height = 480  # height = 720#
     num_blocks = 50
-    #prompt = 'Video in first-person perspective. You are sailing a boat on a sunny day in Hawaii!'
-    #prompt = 'Video in first-person perspective. You are playing drums on the stage at a huge live concert. The venue is crowed with fans.'
-    prompt = 'Video in first-person perspective. You are holding the steering wheel of a formula-1 car.'
+    # prompt = 'Video in first-person perspective. You are sailing a boat on a sunny day in Hawaii!'
+    # prompt = 'Video in first-person perspective. You are playing drums on the stage at a huge live concert. The venue is crowed with fans.'
+    # prompt = 'Video in first-person perspective. You are holding the steering wheel of a formula-1 car.'
+    prompt = 'Video in first-person perspective. You are a cyborg in a cyberpunk future.'
+
     strength = .5
 
     fal_token = await get_fal_ai_token()
@@ -48,9 +50,10 @@ async def my_app(xr: AsyncXR):
             message = await fal_ws.recv()
             assert message == '{"status":"ready"}'
 
-            img, eye = await xr.bundle(
-                xr.image,
-                xr.eye)
+            data = await xr.sense(
+                image=True,
+                eye=True)
+            img, eye = data.image, data.eye
             pil_image = img.as_pil_image().convert('RGB').resize((width, height))
             buffer = io.BytesIO()
             pil_image.save(buffer, format='JPEG')
@@ -76,37 +79,40 @@ async def my_app(xr: AsyncXR):
                     pixels=response.convert('RGBA').tobytes(),
                     width=width,
                     height=height),
+                depth=.48725 * .75,
                 opacity=.9,
                 eye=eye,
                 visible=True)
 
-            for i in range(1):
-                img, eye = await xr.bundle(
-                    xr.image,
-                    xr.eye)
-                pil_image = img.as_pil_image().convert('RGB').resize((width, height))
-                buffer = io.BytesIO()
-                pil_image.save(buffer, format='JPEG')
-                buffer.seek(0)
-                pixels = buffer.read()
-                payload = dict(
-                    image=pixels,
-                    prompt=prompt,
-                    num_blocks=num_blocks,
-                )
-                msgpack_payload = msgpack.packb(payload, use_bin_type=True)
-                await fal_ws.send(msgpack_payload)
-                msgpack_response = await fal_ws.recv()
-                pixels = io.BytesIO(msgpack_response)
-                response = PIL_Image.open(pixels).transpose(PIL_Image.Transpose.FLIP_TOP_BOTTOM)
-                await xr.display(
-                    image=Image(
-                        pixels=response.convert('RGBA').tobytes(),
-                        width=width,
-                        height=height),
-                    opacity=.9,
-                    eye=eye,
-                    visible=True)
+            # for i in range(1):
+            #     data = await xr.sense(
+            #         image=True,
+            #         eye=True)
+            #     img, eye = data.image, data.eye
+            #     pil_image = img.as_pil_image().convert('RGB').resize((width, height))
+            #     buffer = io.BytesIO()
+            #     pil_image.save(buffer, format='JPEG')
+            #     buffer.seek(0)
+            #     pixels = buffer.read()
+            #     payload = dict(
+            #         image=pixels,
+            #         prompt=prompt,
+            #         num_blocks=num_blocks,
+            #     )
+            #     msgpack_payload = msgpack.packb(payload, use_bin_type=True)
+            #     await fal_ws.send(msgpack_payload)
+            #     msgpack_response = await fal_ws.recv()
+            #     pixels = io.BytesIO(msgpack_response)
+            #     response = PIL_Image.open(pixels).transpose(PIL_Image.Transpose.FLIP_TOP_BOTTOM)
+            #     await xr.display(
+            #         image=Image(
+            #             pixels=response.convert('RGBA').tobytes(),
+            #             width=width,
+            #             height=height),
+            #         depth=.48725 * .75,
+            #         opacity=.9,
+            #         eye=eye,
+            #         visible=True)
 
 
 if __name__ == '__main__':

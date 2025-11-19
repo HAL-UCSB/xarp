@@ -1,5 +1,4 @@
 import base64
-import io
 import pathlib
 from typing import Tuple, Optional
 
@@ -61,3 +60,11 @@ class Image(BaseModel):
             self.pil_img_mode,
             (self.width, self.height),
             self.pixels).transpose(PIL_Image.Transpose.FLIP_TOP_BOTTOM)
+
+
+class SenseResult(BaseModel):
+    eye: Optional[Transform] = None
+    head: Optional[Transform] = None
+    image: Optional[Image] = None
+    depth: Optional[Image] = None
+    hands: Optional[Hands] = None
