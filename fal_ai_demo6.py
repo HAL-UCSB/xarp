@@ -37,8 +37,8 @@ async def my_app(xr: AsyncXR):
     num_blocks = 50
     #prompt = 'Video in first-person perspective. You are sailing a boat on a sunny day in Hawaii!'
     #prompt = 'Video in first-person perspective. You are playing drums on the stage at a huge live concert. The venue is crowed with fans.'
-    prompt = 'Video in first-person perspective. You are a race driver piloting a formula-1 in a track in a grand-prix, driving in high speed.'
-    strength = .45
+    prompt = 'Video in first-person perspective. You are holding the steering wheel of a formula-1 car.'
+    strength = .5
 
     fal_token = await get_fal_ai_token()
     fal_ws_url = f'wss://fal.run/fal-ai/krea-wan-14b/ws?fal_jwt_token={fal_token}'
@@ -60,7 +60,7 @@ async def my_app(xr: AsyncXR):
                 start_frame=pixels,
                 prompt=prompt,
                 num_blocks=num_blocks,
-                num_denoising_steps=6,
+                num_denoising_steps=4,
                 strength=strength,
                 width=width,
                 height=height,
@@ -80,32 +80,33 @@ async def my_app(xr: AsyncXR):
                 eye=eye,
                 visible=True)
 
-            img, eye = await xr.bundle(
-                xr.image,
-                xr.eye)
-            pil_image = img.as_pil_image().convert('RGB').resize((width, height))
-            buffer = io.BytesIO()
-            pil_image.save(buffer, format='JPEG')
-            buffer.seek(0)
-            pixels = buffer.read()
-            payload = dict(
-                image=pixels,
-                prompt=prompt,
-                num_blocks=num_blocks,
-            )
-            msgpack_payload = msgpack.packb(payload, use_bin_type=True)
-            await fal_ws.send(msgpack_payload)
-            msgpack_response = await fal_ws.recv()
-            pixels = io.BytesIO(msgpack_response)
-            response = PIL_Image.open(pixels).transpose(PIL_Image.Transpose.FLIP_TOP_BOTTOM)
-            await xr.display(
-                image=Image(
-                    pixels=response.convert('RGBA').tobytes(),
-                    width=width,
-                    height=height),
-                opacity=.9,
-                eye=eye,
-                visible=True)
+            for i in range(1):
+                img, eye = await xr.bundle(
+                    xr.image,
+                    xr.eye)
+                pil_image = img.as_pil_image().convert('RGB').resize((width, height))
+                buffer = io.BytesIO()
+                pil_image.save(buffer, format='JPEG')
+                buffer.seek(0)
+                pixels = buffer.read()
+                payload = dict(
+                    image=pixels,
+                    prompt=prompt,
+                    num_blocks=num_blocks,
+                )
+                msgpack_payload = msgpack.packb(payload, use_bin_type=True)
+                await fal_ws.send(msgpack_payload)
+                msgpack_response = await fal_ws.recv()
+                pixels = io.BytesIO(msgpack_response)
+                response = PIL_Image.open(pixels).transpose(PIL_Image.Transpose.FLIP_TOP_BOTTOM)
+                await xr.display(
+                    image=Image(
+                        pixels=response.convert('RGBA').tobytes(),
+                        width=width,
+                        height=height),
+                    opacity=.9,
+                    eye=eye,
+                    visible=True)
 
 
 if __name__ == '__main__':

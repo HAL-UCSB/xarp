@@ -8,8 +8,10 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
+    "fal-client>=0.8.1",
     "fastapi>=0.119.1",
     "mcp[cli]>=1.18.0",
+    "msgpack>=1.1.2",
     "openai>=2.7.1",
     "pandas>=2.3.3",
     "pydantic-settings>=2.11.0",
