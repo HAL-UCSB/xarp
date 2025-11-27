@@ -38,7 +38,7 @@ async def my_app(xr: AsyncXR):
     # prompt = 'Video in first-person perspective. You are sailing a boat on a sunny day in Hawaii!'
     # prompt = 'Video in first-person perspective. You are playing drums on the stage at a huge live concert. The venue is crowed with fans.'
     # prompt = 'Video in first-person perspective. You are holding the steering wheel of a formula-1 car.'
-    prompt = 'Video in first-person perspective. You are a cyborg in a cyberpunk future.'
+    prompt = 'Video in first-person perspective. You are in a spaceship.'
 
     strength = .5
 

@@ -84,11 +84,11 @@ def get_stage_caption(_frame_key):
 async def playback(xr: AsyncXR):
     previous_instruction = None
     previous_image_frame = None
+    pre_data = await xr.sense(eye=True)
 
     for frame in frames:
-        data = await xr.sense(eye=True)
         image_key, (left_centroid, right_centroid), eye = frame
-        y_offset = data.eye.position[1] - eye.position[1]
+        y_offset = pre_data.eye.position[1] - eye.position[1]
         left_centroid[1] += y_offset
         right_centroid[1] += y_offset
         eye.position[1] += y_offset
@@ -104,8 +104,8 @@ async def playback(xr: AsyncXR):
                 image_key: dict(
                     visible=True,
                     eye=eye,
-                    opacity=1 - error,#np.max([error, .5]),
-                    depth=.48725*.4,
+                    opacity=1 - error,  # np.max([error, .5]),
+                    depth=.48725 * .4,
                 )
             }
             await xr.bundle(**change_frame)
@@ -140,12 +140,12 @@ async def playback(xr: AsyncXR):
             else:
                 right_error = 0
 
-            error = np.max([left_error, right_error]) / 1.3
+            error = np.max([left_error, right_error]) / 1.2
             if error > 1:
                 print(error)
 
             await xr.display(
-                opacity=1 - error,#np.max([error, .5]),
+                opacity=1 - error,  # np.max([error, .5]),
                 visible=True,
                 eye=eye,
                 depth=.48725 * .4,

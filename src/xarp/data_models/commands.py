@@ -1,6 +1,6 @@
 from typing import Any, List, Dict, ClassVar, Optional
 
-from pydantic import BaseModel, Field, JsonValue
+from pydantic import BaseModel, Field, JsonValue, ConfigDict, computed_field
 
 from xarp.data_models.responses import Hands, Image, SenseResult
 from xarp.data_models.spatial import Transform, FloatArrayLike
@@ -8,11 +8,21 @@ from xarp.time import utc_ts
 
 
 class XRCommand(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid'
+    )
+
     ts: int = Field(default_factory=utc_ts)
     xid: Optional[int] = None
-    cmd: str
     args: List = Field(default_factory=list)
     kwargs: Dict[str, Any] = Field(default_factory=dict)
+
+    _cmd: ClassVar[str]
+
+    @computed_field
+    @property
+    def cmd(self) -> str:
+        return self._cmd
 
     @classmethod
     def validate_result(cls, json_data: Dict) -> Any:
@@ -26,7 +36,6 @@ class XRCommand(BaseModel):
 
 
 class WriteCommand(XRCommand):
-    cmd: str = 'write'
     _cmd: ClassVar[str] = 'write'
 
     def __init__(self,
@@ -43,7 +52,6 @@ class WriteCommand(XRCommand):
 
 
 class SayCommand(WriteCommand):
-    cmd: str = 'say'
     _cmd: ClassVar[str] = 'say'
 
     def __init__(self,
@@ -55,12 +63,11 @@ class SayCommand(WriteCommand):
 
     @classmethod
     def validate_result(cls, json_data: Dict) -> Any:
-        # wait until said
+        # wait until said but nothing to validate
         pass
 
 
 class ReadCommand(WriteCommand):
-    cmd: str = 'read'
     _cmd: ClassVar[str] = 'read'
 
     @classmethod
@@ -69,9 +76,8 @@ class ReadCommand(WriteCommand):
 
 
 class ImageCommand(XRCommand):
-    cmd: str = 'image'
-    pil_img_mode: ClassVar[str] = 'RGBA'
     _cmd: ClassVar[str] = 'image'
+    pil_img_mode: ClassVar[str] = 'RGBA'
 
     @classmethod
     def validate_result(cls, json_data: Dict) -> Image:
@@ -81,9 +87,8 @@ class ImageCommand(XRCommand):
 
 
 class DepthCommand(ImageCommand):
-    cmd: str = 'depth'
-    pil_img_mode: ClassVar[str] = 'I;16'
     _cmd: ClassVar[str] = 'depth'
+    pil_img_mode: ClassVar[str] = 'I;16'
 
     @classmethod
     def validate_result(cls, json_data: Dict) -> Image:
@@ -93,7 +98,6 @@ class DepthCommand(ImageCommand):
 
 
 class EyeCommand(XRCommand):
-    cmd: str = 'eye'
     _cmd: ClassVar[str] = 'eye'
 
     def __init__(self, **kwargs):
@@ -105,7 +109,6 @@ class EyeCommand(XRCommand):
 
 
 class HeadCommand(XRCommand):
-    cmd: str = 'head'
     _cmd: ClassVar[str] = 'head'
 
     def __init__(self, **kwargs):
@@ -117,7 +120,6 @@ class HeadCommand(XRCommand):
 
 
 class HandsCommand(XRCommand):
-    cmd: str = 'hands'
     _cmd: ClassVar[str] = 'hands'
 
     def __init__(self, **kwargs):
@@ -129,7 +131,6 @@ class HandsCommand(XRCommand):
 
 
 class SenseCommand(XRCommand):
-    cmd: str = 'sense'
     _cmd: ClassVar[str] = 'sense'
     _validation_map: ClassVar[Dict] = dict(
         eye=EyeCommand,
@@ -148,7 +149,6 @@ class SenseCommand(XRCommand):
 
 
 class SphereCommand(XRCommand):
-    cmd: str = 'sphere'
     _cmd: ClassVar[str] = 'sphere'
 
     def __init__(self,
@@ -166,7 +166,6 @@ class SphereCommand(XRCommand):
 
 
 class DisplayCommand(XRCommand):
-    cmd: str = 'display'
     _cmd: ClassVar[str] = 'display'
 
     def __init__(self,
@@ -191,11 +190,10 @@ class DisplayCommand(XRCommand):
 
 
 class ClearCommand(XRCommand):
-    cmd: str = 'clear'
     _cmd: ClassVar[str] = 'clear'
 
+
 class SaveCommand(XRCommand):
-    cmd: str = 'save'
     _cmd: ClassVar[str] = 'save'
 
     def __init__(self, *args):
@@ -203,19 +201,18 @@ class SaveCommand(XRCommand):
 
 
 class LoadCommand(XRCommand):
-    cmd: str = 'load'
     _cmd: ClassVar[str] = 'load'
 
     def __init__(self, *args):
         super().__init__(args=args)
 
 
-class BundleCommand(XRCommand):
-    cmd: str = 'bundle'
-    _cmd: ClassVar[str] = 'bundle'
+class GLBCommand(XRCommand):
+    _cmd: ClassVar[str] = 'glb'
 
-    def __init__(self, **kwargs):
-        super().__init__(kwargs=kwargs)
+    def __init__(self, data):
+        super().__init__(args=(data,))
+
 
 class XRResult(BaseModel):
     ts: int = Field(default_factory=utc_ts)

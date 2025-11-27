@@ -27,6 +27,8 @@ def sandbox_save(xr:XR):
 
 
 def sandbox_load(xr:XR):
+    xr.say('hello')
+    pass
     xr.say('start')
     for i in range(2):
         key = f'key_{i}'

@@ -22,6 +22,16 @@ from pydantic import BaseModel, field_validator, model_validator, ConfigDict, fi
 FloatArrayLike = Union[Iterable[float], np.ndarray]
 
 
+def distance(a: np.ndarray, b: np.ndarray):
+    return np.linalg.norm(a - b)
+
+
+def cosine_similarity(a: np.ndarray, b: np.ndarray):
+    a = a / np.linalg.norm(a)
+    b = b / np.linalg.norm(b)
+    return np.dot(a, b)
+
+
 # ---- Quaternion and rotation helpers -----------------------------------------
 def _as_np1d(x: FloatArrayLike, length: int, name: str) -> np.ndarray:
     arr = np.asarray(x, dtype=float).reshape(-1)
