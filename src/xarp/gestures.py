@@ -1,5 +1,5 @@
-from xarp import XR, run_xr_app
-from xarp.storage.local_file_system import SessionRepositoryLocalFileSystem
+from typing import Union
+
 from xarp.data_models.spatial import distance, cosine_similarity
 import numpy as np
 
@@ -120,7 +120,7 @@ def palm_normal(hand):
 
 # ----------------- pinch gestures -----------------
 
-def pinch(hand, threshold=0.015):
+def pinch(hand, threshold=0.015) -> Union[bool, float]:
     """
     Thumb–index pinch. Metric: distance thumb_tip–index_tip (m).
     Default threshold ~1.5 cm.
@@ -131,21 +131,21 @@ def pinch(hand, threshold=0.015):
     return dist if threshold is None else dist < threshold
 
 
-def pinch_middle(hand, threshold=0.015):
+def pinch_middle(hand, threshold=0.015) -> Union[bool, float]:
     thumb_tip = hand[THUMB_TIP].position
     middle_tip = hand[MIDDLE_TIP].position
     dist = distance(middle_tip, thumb_tip)
     return dist if threshold is None else dist < threshold
 
 
-def pinch_ring(hand, threshold=0.015):
+def pinch_ring(hand, threshold=0.015) -> Union[bool, float]:
     thumb_tip = hand[THUMB_TIP].position
     ring_tip = hand[RING_TIP].position
     dist = distance(ring_tip, thumb_tip)
     return dist if threshold is None else dist < threshold
 
 
-def double_pinch(hands, threshold=None):
+def double_pinch(hands, threshold=None) -> Union[None, float]:
     if threshold is not None:
         if not pinch(hands.left, threshold) or not pinch(hands.right, threshold):
             return None
@@ -164,7 +164,7 @@ def double_pinch(hands, threshold=None):
 
 # ----------------- pose / extension gestures -----------------
 
-def fist(hand, threshold=0.6):
+def fist(hand, threshold=0.6) -> Union[bool, float]:
     """
     Metric: mean flexion of the four long fingers in [0,1].
     Higher → more fist-like.
@@ -175,7 +175,7 @@ def fist(hand, threshold=0.6):
     return metric if threshold is None else metric > threshold
 
 
-def open_hand(hand, threshold=0.8):
+def open_hand(hand, threshold=0.8) -> Union[bool, float]:
     """
     Metric: mean extension of the four long fingers in [0,1].
     Higher → more open.
@@ -186,7 +186,7 @@ def open_hand(hand, threshold=0.8):
     return metric if threshold is None else metric > threshold
 
 
-def point(hand, threshold=0.3):
+def point(hand, threshold=0.3) -> Union[bool, float]:
     """
     Index extended, others less extended.
     Metric = ext(index) - max(ext(middle, ring, pinky)).
@@ -201,7 +201,7 @@ def point(hand, threshold=0.3):
     return metric if threshold is None else metric > threshold
 
 
-def victory(hand, threshold=0.5):
+def victory(hand, threshold=0.5) -> Union[bool, float]:
     """
     Index + middle extended; ring + pinky more flexed.
     Metric = (ext(index)+ext(middle)) - (ext(ring)+ext(pinky)).
@@ -218,7 +218,7 @@ def victory(hand, threshold=0.5):
 
 # ----------------- thumb orientation -----------------
 
-def thumbs_up(hand, threshold=0.7):
+def thumbs_up(hand, threshold=0.7) -> Union[bool, float]:
     """
     Metric: cosine similarity between thumb direction and palm normal.
     Range [-1,1]; > 0.7 means roughly aligned.
@@ -234,7 +234,7 @@ def thumbs_up(hand, threshold=0.7):
 
 # ----------------- flat palm -----------------
 
-def flat_palm(hand, threshold=0.015):
+def flat_palm(hand, threshold=0.015) -> Union[bool, float]:
     """
     Metric: max distance (m) of metacarpal joints (index/middle/ring/pinky)
     from their best-fit plane. Smaller → flatter palm.
@@ -259,7 +259,7 @@ def flat_palm(hand, threshold=0.015):
 
 # ----------------- coarse grab -----------------
 
-def coarse_grab(hand, threshold=0.035):
+def coarse_grab(hand, threshold=0.035) -> Union[bool, float]:
     """
     Metric: mean distance (m) from thumb tip to all other fingertips.
     Lower → more closed / grab-like (no contact/force semantics).

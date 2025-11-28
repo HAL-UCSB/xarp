@@ -54,7 +54,7 @@ async def my_app(xr: AsyncXR):
                 image=True,
                 eye=True)
             img, eye = data.image, data.eye
-            pil_image = img.as_pil_image().convert('RGB').resize((width, height))
+            pil_image = img.to_pil_image().convert('RGB').resize((width, height))
             buffer = io.BytesIO()
             pil_image.save(buffer, format='JPEG')
             buffer.seek(0)

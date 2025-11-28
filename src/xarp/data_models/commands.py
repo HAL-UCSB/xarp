@@ -2,10 +2,10 @@ from typing import Any, List, Dict, ClassVar, Optional
 
 from pydantic import BaseModel, Field, JsonValue, ConfigDict, computed_field
 
-from xarp.data_models.responses import Hands, Image, SenseResult
+from xarp.data_models.responses import Hands, Image, SenseResult, DeviceInfo
 from xarp.data_models.spatial import Transform, FloatArrayLike
 from xarp.time import utc_ts
-
+from PIL import Image as PIL_Image
 
 class XRCommand(BaseModel):
     model_config = ConfigDict(
@@ -82,7 +82,8 @@ class ImageCommand(XRCommand):
     @classmethod
     def validate_result(cls, json_data: Dict) -> Image:
         img = Image.model_validate(json_data)
-        img.pil_img_mode = ImageCommand.pil_img_mode
+        pil_img = img.to_pil_image().transpose(PIL_Image.Transpose.FLIP_TOP_BOTTOM)
+        img.pixels = pil_img.tobytes()
         return img
 
 
@@ -212,6 +213,14 @@ class GLBCommand(XRCommand):
 
     def __init__(self, data):
         super().__init__(args=(data,))
+
+
+class InfoCommand(XRCommand):
+    _cmd: ClassVar[str] = 'info'
+
+    @classmethod
+    def validate_result(cls, json_data: Dict) -> Any:
+        return DeviceInfo.model_validate(json_data)
 
 
 class XRResult(BaseModel):

@@ -14,9 +14,9 @@ from xarp.data_models import model_cls_to_mimetype
 from xarp.data_models.chat import ChatMessage
 from xarp.data_models.commands import XRCommand, ClearCommand, WriteCommand, ReadCommand, ImageCommand, DepthCommand, \
     EyeCommand, DisplayCommand, HandsCommand, SphereCommand, XRResult, SenseCommand, SayCommand, SaveCommand, \
-    LoadCommand, GLBCommand
+    LoadCommand, GLBCommand, InfoCommand
 from xarp.data_models.entities import Session
-from xarp.data_models.responses import Hands, Image, SenseResult
+from xarp.data_models.responses import Hands, Image, SenseResult, DeviceInfo
 from xarp.data_models.spatial import Transform, FloatArrayLike
 from xarp.settings import settings
 from xarp.storage import SessionRepository
@@ -172,8 +172,11 @@ class AsyncXR:
     async def load(self, *keys) -> None:
         await self._execute(LoadCommand, *keys)
 
-    async def glb(self, data)-> None:
+    async def glb(self, data) -> None:
         await self._execute(GLBCommand, data)
+
+    async def info(self) -> DeviceInfo:
+        return await self._execute(InfoCommand)
 
     def as_mcp_server(self):
         mcp = FastMCP('XARP')
@@ -258,6 +261,9 @@ class XR:
 
     def glb(self, data) -> None:
         return self._sync(self.as_async.glb, data)
+
+    def info(self) -> DeviceInfo:
+        return self._sync(self.as_async.info)
 
     def as_tool(self):
         return [

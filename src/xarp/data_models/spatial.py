@@ -392,3 +392,34 @@ if __name__ == '__main__':
     M = T1.matrix()
     T1_rt = Transform.from_matrix(M)
     assert np.allclose(T1_rt.matrix(), M, atol=1e-9)
+
+
+def convex_hull_2d(points: np.ndarray) -> np.ndarray:
+    pts = np.asarray(points, dtype=np.float64)
+    if pts.shape[0] <= 1:
+        return pts.copy()
+
+    # Sort by x, then by y
+    pts = pts[np.lexsort((pts[:, 1], pts[:, 0]))]
+
+    def cross(o, a, b):
+        # 2D cross product (OA x OB)
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    # Build lower hull
+    lower = []
+    for p in pts:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], p) <= 0:
+            lower.pop()
+        lower.append(tuple(p))
+
+    # Build upper hull
+    upper = []
+    for p in reversed(pts):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], p) <= 0:
+            upper.pop()
+        upper.append(tuple(p))
+
+    # Concatenate lower + upper, removing the last point of each (they repeat)
+    hull = lower[:-1] + upper[:-1]
+    return np.array(hull, dtype=np.float64)

@@ -12,8 +12,8 @@ def my_app(xr: XR):
         xr.image)
     print('pass')
 
-    depth = np.array(depth.as_pil_image())
-    rgba = np.array(rgba.as_pil_image())
+    depth = np.array(depth.to_pil_image())
+    rgba = np.array(rgba.to_pil_image())
 
     H, W, _ = rgba.shape
     h, w = depth.shape
