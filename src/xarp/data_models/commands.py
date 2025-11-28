@@ -211,8 +211,8 @@ class LoadCommand(XRCommand):
 class GLBCommand(XRCommand):
     _cmd: ClassVar[str] = 'glb'
 
-    def __init__(self, data):
-        super().__init__(args=(data,))
+    def __init__(self, data, position):
+        super().__init__(args=(data, position))
 
 
 class InfoCommand(XRCommand):

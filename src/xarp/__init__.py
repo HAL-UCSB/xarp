@@ -172,8 +172,8 @@ class AsyncXR:
     async def load(self, *keys) -> None:
         await self._execute(LoadCommand, *keys)
 
-    async def glb(self, data) -> None:
-        await self._execute(GLBCommand, data)
+    async def glb(self, data, position) -> None:
+        await self._execute(GLBCommand, data, position)
 
     async def info(self) -> DeviceInfo:
         return await self._execute(InfoCommand)
@@ -259,8 +259,8 @@ class XR:
     def load(self, *keys) -> None:
         return self._sync(self.as_async.load, *keys)
 
-    def glb(self, data) -> None:
-        return self._sync(self.as_async.glb, data)
+    def glb(self, data, position) -> None:
+        return self._sync(self.as_async.glb, data, position)
 
     def info(self) -> DeviceInfo:
         return self._sync(self.as_async.info)
