@@ -2,21 +2,16 @@ import json
 import pathlib
 from typing import Generator, Optional
 
-from xarp.data_models import mimetype_to_model_cls
+from xarp.data_models.binaries import BinaryResource
 from xarp.data_models.entities import Session, User
-from xarp.data_models.responses import Image
 from xarp.storage import SessionRepository, UserRepository
 
 
 def _load_session(path: pathlib.Path) -> Session:
     chat_path = path / 'chat.json'
     with chat_path.open() as f:
-        chat_json = json.load(f)
-        session = Session(**chat_json)
-        for chat_message in session.chat:
-            model_cls = mimetype_to_model_cls[chat_message.mimetype]
-            chat_message.content = model_cls.model_validate_json(chat_message.content)
-        return session
+        chat_json = f.read()
+        return Session.model_validate_json(chat_json)
 
 
 def _load_user(path: pathlib.Path) -> User:
@@ -26,7 +21,7 @@ def _load_user(path: pathlib.Path) -> User:
 
 class SessionRepositoryLocalFileSystem(SessionRepository):
 
-    def __init__(self, local_storage: pathlib.Path = None, *args, **kwargs):
+    def __init__(self, local_storage: pathlib.Path, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._local_storage = pathlib.Path(local_storage)
 
@@ -35,7 +30,7 @@ class SessionRepositoryLocalFileSystem(SessionRepository):
         return _load_session(user_session_path)
 
     def all(self, user_id: str = None) -> Generator[Session]:
-        if user_id is not None:
+        if user_id is None:
             for user_path in self._local_storage.iterdir():
                 yield from self.all(user_path.name)
         else:
@@ -52,12 +47,11 @@ class SessionRepositoryLocalFileSystem(SessionRepository):
 
         i = 0
         for chat_message in session.chat:
-            if chat_message.mimetype == 'application/xarp/image' and isinstance(chat_message.content, str):
-                img = Image.model_validate_json(chat_message.content)
-                img_path = files_path / f'{i}.png'
-                img.dump_pixels(img_path)
-                chat_message.content = img.model_dump_json()
-                i += 1
+            for content in chat_message.content:
+                bin_path = files_path / f'{i}.png'
+                if isinstance(content, BinaryResource):
+                    content.to_file(bin_path)
+                    i += 1
 
         with chat_path.open('w', encoding='utf-8') as f:
             f.write(session.model_dump_json())

@@ -1,14 +1,7 @@
-import base64
-import io
-from asyncio import sleep
-from functools import partial
-from urllib.parse import urlparse
-
 import numpy as np
 
-from xarp import XR, run_xr_app, settings, Hands, AsyncXR
-from xarp.data_models.responses import Image
-from xarp.data_models.chat import ChatMessage
+from xarp import run_xr_app, settings, Hands, AsyncXR
+from xarp.data_models.data import Image
 from xarp.data_models.spatial import centroid
 from xarp.storage.local_file_system import SessionRepositoryLocalFileSystem
 

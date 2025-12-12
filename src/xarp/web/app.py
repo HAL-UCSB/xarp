@@ -11,7 +11,7 @@ from streamlit.runtime.scriptrunner_utils.script_run_context import get_script_r
 from websockets import WebSocketException
 from websockets.sync.client import connect
 
-from xarp.data_models import ChatMessage
+from xarp.data_models.chat import ChatMessage
 from xarp.data_models.spatial import Transform
 from xarp.storage.local_file_system import UserRepositoryLocalFileSystem
 from xarp.web.chat_ui import render_chat_messages, require_session_obj

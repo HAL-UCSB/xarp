@@ -1,8 +1,22 @@
-from typing import ClassVar, Any
-
+from typing import ClassVar, Any, Iterable, Union
 from pydantic import BaseModel, Field
 
+from xarp.data_models.spatial import Vector3, Quaternion, Pose, Transform
+from xarp.data_models.data import Hands, CameraIntrinsics, DeviceInfo
+from xarp.data_models.binaries import BinaryResource
+
 from xarp.time import utc_ts
+
+ChatUIDataTypes = Union[
+    DeviceInfo,
+    CameraIntrinsics,
+    Hands,
+    Transform,
+    Vector3,
+    Quaternion,
+    Pose,
+    BinaryResource
+]
 
 
 class ChatMessage(BaseModel):
@@ -12,32 +26,22 @@ class ChatMessage(BaseModel):
 
     ts: int = Field(default_factory=utc_ts)
     role: str
-    mimetype: str = 'text/plain'
-    content: Any
+    content: list[ChatUIDataTypes]
 
     @classmethod
-    def from_user(cls,
-                  content: Any,
-                  mimetype: str) -> 'ChatMessage':
+    def from_user(cls, content: Any) -> 'ChatMessage':
         return cls(
             role=cls.user,
-            mimetype=mimetype,
-            content=content)
+            content=list(content) if isinstance(content, Iterable) else [content])
 
     @classmethod
-    def from_assistant(cls,
-                       content: Any,
-                       mimetype: str = 'text/plain') -> 'ChatMessage':
+    def from_assistant(cls, content: Any) -> 'ChatMessage':
         return cls(
             role=cls.assistant,
-            mimetype=mimetype,
-            content=content)
+            content=list(content) if isinstance(content, Iterable) else [content])
 
     @classmethod
-    def from_system(cls,
-                    content: Any,
-                    mimetype: str = 'text/plain') -> 'ChatMessage':
+    def from_system(cls, content: Any) -> 'ChatMessage':
         return cls(
             role=cls.system,
-            mimetype=mimetype,
-            content=content)
+            content=list(content) if isinstance(content, Iterable) else [content])

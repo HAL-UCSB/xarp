@@ -11,17 +11,17 @@ def my_app(xr: XR):
     now = utc_ts()
     try:
         while True:
-            a, b, c = xr.bundle(
-                xr.image,
-                xr.hands,
-                xr.eye
+            senses = xr.sense(
+                image=True,
+                hands=True,
+                eye=True,
             )
             print(i)
             i += 1
     finally:
         print(i / (utc_ts() - now))
         repo = SessionRepositoryLocalFileSystem(settings.local_storage)
-        repo.save(xr.session)
+        repo.save(xr.log_chat)
 
     while True:
         pass

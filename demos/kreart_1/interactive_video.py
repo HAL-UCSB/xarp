@@ -29,14 +29,14 @@ def playback_app(xr: XR):
         if message.role != ChatMessage.user:
             continue
 
-        cmd = message.content.text[0]
+        cmd = message.content.plain[0]
         match cmd:
             case 'eye':
-                str_data = message.content.text[1]
+                str_data = message.content.plain[1]
                 model_dict = json.loads(str_data)
                 eye = Transform.model_validate(model_dict)
             case 'hands':
-                str_data = message.content.text[1]
+                str_data = message.content.plain[1]
                 model_dict = json.loads(str_data)
                 hands = Hands.model_validate(model_dict)
             case 'image':

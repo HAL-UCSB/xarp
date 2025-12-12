@@ -10,7 +10,7 @@ def my_app(xr: XR):
             continue
         if hands.right:
             joint_position = hands.right[0].position
-            xr.sphere(joint_position, key=str(i))
+            xr.SPHERE(joint_position, key=str(i))
             i += 1
         if hands.left:
             i = 0

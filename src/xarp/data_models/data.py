@@ -1,17 +1,35 @@
 import base64
+import mimetypes
+import mimetypes
 import pathlib
-import numpy as np
-from typing import Tuple, Optional
+from enum import Enum
+from io import BytesIO
+from os import PathLike
+from typing import Tuple, Optional, ClassVar, IO, Any
 
+import PIL
 import PIL.Image as PIL_Image
-from pydantic import BaseModel, Field, field_serializer, field_validator, ConfigDict, computed_field
+import numpy as np
+from pydantic import BaseModel, Field, ConfigDict, RootModel, field_serializer
 
-from xarp.data_models.spatial import Transform, FloatArrayLike
+from xarp.data_models.encoding import LazyBase64Bytes
+from xarp.data_models.spatial import Transform, Pose, Vector3
+
+
+class MIMEType(str, Enum):
+    plain = mimetypes.types_map['.txt']
+    png = mimetypes.types_map['.png']
+    jpeg = mimetypes.types_map['.jpg']
+    mp3 = mimetypes.types_map['.mp3']
+    wav = mimetypes.types_map['.wav']
+    ogg = 'audio/ogg'
+    mp4 = mimetypes.types_map['.mp4']
+    glb = 'model/gltf-binary'
 
 
 class Hands(BaseModel):
-    left: Tuple[Transform, ...] = Field(default_factory=tuple)
-    right: Tuple[Transform, ...] = Field(default_factory=tuple)
+    left: Tuple[Pose, ...] = Field(default_factory=tuple)
+    right: Tuple[Pose, ...] = Field(default_factory=tuple)
 
     def __getitem__(self, item):
         if item == 0:
@@ -26,42 +44,23 @@ class Hands(BaseModel):
 
 
 class Image(BaseModel):
-    pixels: Optional[bytes] = None
+    pixels: LazyBase64Bytes | None = None
     width: int
     height: int
     pil_img_mode: str = 'RGBA'
-    path: Optional[pathlib.PurePath] = None
+    path: pathlib.PurePath | None = None
 
-    @computed_field
     @property
     def size(self) -> Tuple[int, int]:
         return self.width, self.height
-
-    @field_validator("pixels", mode="before")
-    def decode_if_base64(cls, v):
-        if v is None:
-            return None
-        if isinstance(v, str):
-            try:
-                return base64.b64decode(v)
-            except Exception:
-                raise ValueError("Invalid base64 encoding")
-        return v
-
-    @field_serializer('pixels')
-    def encode_to_base64(self, v, _info):
-        v = PIL_Image.frombytes(self.pil_img_mode, self.size, v).transpose(
-            PIL_Image.Transpose.FLIP_TOP_BOTTOM).tobytes()
-        if v is None:
-            return None
-        return base64.b64encode(v)
 
     def load_pixels(self, scale: float = None) -> 'Image':
         img = PIL_Image.open(self.path)
         self.width, self.height = img.size
         if scale is not None:
             img.thumbnail((self.width * scale, self.height * scale))
-        self.pixels = img.tobytes()
+        self.pixels = LazyBase64Bytes(img.tobytes())
+        self.path = None
         return self
 
     def dump_pixels(self, path: pathlib.PurePath) -> 'Image':
@@ -75,15 +74,13 @@ class Image(BaseModel):
     def to_pil_image(self) -> PIL_Image.Image:
         if self.path:
             return PIL_Image.open(self.path)
-        return PIL_Image.frombytes(
-            self.pil_img_mode,
-            (self.width, self.height),
-            self.pixels)
+        temp = BytesIO(self.pixels)
+        return PIL_Image.open(temp)
 
     @classmethod
     def from_pil_image(cls, source: PIL_Image.Image) -> 'Image':
         return Image(
-            pixels=source.tobytes(),
+            pixels=LazyBase64Bytes(source.tobytes()),
             pil_img_mode=source.mode,
             height=source.height,
             width=source.width)
@@ -130,8 +127,8 @@ class CameraIntrinsics(BaseModel):
         return K
 
     def world_to_pixel(self,
-                       world_point: FloatArrayLike,
-                       camera_pose: Transform) -> FloatArrayLike:
+                       world_point: Vector3,
+                       camera_pose: Transform) -> Vector3:
         wp = np.asarray(world_point, dtype=float)
         single_point = (wp.ndim == 1)  # (3,)
         if single_point:

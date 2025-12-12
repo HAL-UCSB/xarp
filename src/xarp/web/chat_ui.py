@@ -1,13 +1,11 @@
-import json
 import pathlib
-from json import JSONDecodeError
-from pathlib import Path
 from typing import List
 
 import pandas as pd
 import streamlit as st
 
-from xarp.data_models import ChatMessage
+from xarp.data_models.binaries import ImageResource, BinaryResource
+from xarp.data_models.chat import ChatMessage
 
 
 def require_session_obj(key, default):
@@ -37,39 +35,15 @@ def render_file_preview(path: pathlib.PurePath):
 
 def render_chat_message(i: int, message: ChatMessage):
     with st.chat_message(message.role):
-        for _text in message.content.text:
-            try:
-                json_data = json.loads(_text)
-                st.json(json_data)
-            except JSONDecodeError:
-                st.markdown(_text)
+        for content in message.content:
 
-        for path in message.content.files:
-            if str(path).startswith('file:'):
-                path = pathlib.PurePath(str(path)[6:])
+            if isinstance(content, ImageResource):
+                with open(content.path.as_posix(), 'rb') as f:
+                    st.image(f.read(), width='stretch')
+                    continue
 
-            render_file_preview(path)
-
-            # download
-            with open(path, 'rb') as f:
-                raw = f.read()
-
-            st.download_button(
-                label='Download',
-                data=raw,
-                file_name=path.name,
-                icon=':material/download:',
-                key=f'download_button_{message.ts}',
-            )
-
-
-def save_files(files, persistent_path: Path) -> List[pathlib.Path]:
-    paths = []
-    for file in files:
-        path = persistent_path / file.name
-        path.write_bytes(file.read())
-        paths.append(path)
-    return paths
+            content_json = content.model_dump_json()
+            st.json(content_json, expanded=False)
 
 
 @st.fragment

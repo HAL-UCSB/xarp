@@ -1,7 +1,6 @@
 import asyncio
-import contextlib
-from asyncio import AbstractEventLoop
-from typing import Callable, Any, List, Union, Awaitable, Sequence, Dict, Optional
+from asyncio import AbstractEventLoop, CancelledError
+from typing import Callable, Any, List, Union, Awaitable, AsyncGenerator
 
 import uvicorn
 from fastapi import FastAPI, WebSocket, HTTPException
@@ -10,106 +9,158 @@ from pydantic import BaseModel
 from starlette.websockets import WebSocketDisconnect
 
 from xarp.auth import settings_file_authorization
-from xarp.data_models import model_cls_to_mimetype
+from xarp.commands.sense import SenseCommand, ImageCommand, DepthCommand, EyeCommand, HandsCommand
+from xarp.commands.ui import WriteCommand, SayCommand, ReadCommand
 from xarp.data_models.chat import ChatMessage
-from xarp.data_models.commands import XRCommand, ClearCommand, WriteCommand, ReadCommand, ImageCommand, DepthCommand, \
-    EyeCommand, DisplayCommand, HandsCommand, SphereCommand, XRResult, SenseCommand, SayCommand, SaveCommand, \
-    LoadCommand, GLBCommand, InfoCommand
+from xarp.commands import XRCommand, XRResponse, ResponseMode, CancelCommand
 from xarp.data_models.entities import Session
-from xarp.data_models.responses import Hands, Image, SenseResult, DeviceInfo
-from xarp.data_models.spatial import Transform, FloatArrayLike
+from xarp.data_models.data import Hands, Image, SenseResult, DeviceInfo
+from xarp.data_models.spatial import Transform, Vector3
 from xarp.settings import settings
 from xarp.storage import SessionRepository
 from xarp.storage.local_file_system import SessionRepositoryLocalFileSystem
 
 
-class AsyncXR:
+class RemoteXRClient:
 
-    def __init__(self,
-                 ws: WebSocket,
-                 session: Session):
+    def __init__(self, ws: WebSocket):
         self.ws = ws
-        self.session = session
-        self.logs = []
-        self.log_chat = False
-        self._next_xid: int = 1
-        self._pending: Dict[int, asyncio.Future] = {}
-        self._recv_task: Optional[asyncio.Task] = None
+        self.notification_callbacks: list[Callable[..., Awaitable[None]]] = []
+        self._next_xid = 0
         self._send_lock = asyncio.Lock()
+        self._recv_task: asyncio.Task | None = None
+        self._pending_singles: dict[int, asyncio.Future[XRResponse]] = dict()
+        self._pending_streams: dict[int, asyncio.Queue[XRResponse]] = dict()
 
     async def start(self) -> None:
         if self._recv_task is not None:
-            raise RuntimeError('Attempt to start an instance of AsyncXR that is already running')
+            raise RuntimeError('This RemoteXRClient is already running.')
         self._recv_task = asyncio.create_task(self._recv_loop())
-
-    async def stop(self, exception=None) -> None:
-        if self._recv_task is None:
-            return
-
-        self._recv_task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await self._recv_task
-        self._recv_task = None
-
-        for fut in self._pending.values():
-            if not fut.done():
-                fut.set_exception(exception or WebSocketDisconnect(code=1006))
-        self._pending.clear()
-
-    async def __aenter__(self) -> 'AsyncXR':
-        await self.start()
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self.stop(exception=exc)
 
     async def _recv_loop(self) -> None:
         try:
             while True:
                 raw = await self.ws.receive_text()
-                result = XRResult.model_validate_json(raw)
-                fut = self._pending.pop(result.xid, None)
-                if fut is None or fut.done():
+                result = XRResponse.model_validate_json(raw)
+                xid = getattr(result, 'xid', None)
+
+                # Notifications
+                # TODO: slow callbacks can stall _recv_loop
+                if xid is None:
+                    for callback in list(self.notification_callbacks):
+                        await callback(result)
                     continue
-                fut.set_result(result)
-        except WebSocketDisconnect as e:
-            await self.stop()
-            raise e
+
+                # Single result
+                fut = self._pending_singles.pop(xid, None)
+                if fut is not None:
+                    if not fut.done():
+                        fut.set_result(result)
+                    continue
+
+                # Stream
+                queue = self._pending_streams.get(xid)
+                if queue is not None:
+                    if result.value is None or isinstance(result.value, Exception):
+                        self._pending_streams.pop(xid)
+                    queue.put_nowait(result)
+
         except asyncio.CancelledError:
-            pass
+            raise
+        except WebSocketDisconnect as e:
+            self._raise_waiters(e)
+        except Exception as e:
+            self._raise_waiters(e)
 
-    async def _execute(self, command_type, *args, **kwargs) -> Any:
-        # skip null keywords
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+    def stop(self, exception: BaseException | None = None) -> None:
+        if self._recv_task is None:
+            return
+        self._recv_task.cancel()
+        self._recv_task = None
+        self._raise_waiters(exception)
 
-        command = command_type(*args, **kwargs)
-        if command_type.expects_response():
-            command.xid = self._next_xid
-            self._next_xid += 1
+    def _raise_waiters(self, exception: BaseException | None):
+        if exception is None:
+            exception = CancelledError()
 
-        if self.log_chat:
-            self._log_command(command)
+        for fut in self._pending_singles.values():
+            if not fut.done():
+                fut.set_exception(exception)
+        self._pending_singles.clear()
+
+        for xid, queue in self._pending_streams.items():
+            eos = XRResponse(xid=xid, value=None)
+            queue.put_nowait(eos)
+        self._pending_streams.clear()
+
+    async def __aenter__(self) -> 'RemoteXRClient':
+        await self.start()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        self.stop(exception=exc)
+
+    async def execute(self, command: XRCommand) -> AsyncGenerator | Any | None:
+        # no response mode
+        if not command.expects_response:
+            async with self._send_lock:
+                command_json = command.model_dump_json()
+                return await self.ws.send_text(command_json)
+
+        # assign the next xid
+        self._next_xid = (self._next_xid + 1) & 0xFFFFFFFFFFFFFFFF
+        command.xid = self._next_xid
+        command_json = command.model_dump_json()
+
+        # single response mode
+        if command.response_mode == ResponseMode.SINGLE:
+            fut = asyncio.get_running_loop().create_future()
+            self._pending_singles[command.xid] = fut
+            async with self._send_lock:
+                await self.ws.send_text(command_json)
+            result = await fut
+            return command.validate_response(result.value)
+
+        # stream response mode
+        queue: asyncio.Queue[XRResponse] = asyncio.Queue()
+        self._pending_streams[command.xid] = queue
 
         async with self._send_lock:
-            command_json = command.model_dump_json()
             await self.ws.send_text(command_json)
 
-        if command.xid is None:
-            return None
+        async def stream():
+            eos = False
+            try:
+                while True:
+                    item = await queue.get()
+                    if item.value is None:
+                        eos = True
+                        break
+                    yield command.validate_response(item.value)
+            finally:
+                self._pending_streams.pop(command.xid, None)
+                if not eos:
+                    cancel = CancelCommand(target_xid=command.xid)
+                    await self.execute(cancel)
 
-        fut = asyncio.get_running_loop().create_future()
-        self._pending[command.xid] = fut
+        return stream()
 
-        result = await fut
-        result_value = command_type.validate_result(result.value)
-        if self.log_chat:
-            self._log_result(result_value)
-        return result_value
+
+class AsyncXR(RemoteXRClient):
+
+    def __init__(self,
+                 ws: WebSocket,
+                 session: Session):
+        super().__init__(ws)
+        self.session = session
+        self.logs = []
+        self.log_chat = False
 
     def _log_command(self, command: XRCommand):
         command_message = ChatMessage.from_system(
             command.model_dump_json(),
-            mimetype=model_cls_to_mimetype[type(command)])
+            # mimetype=model_cls_to_mimetype[type(command)]
+        )
         self.session.chat.append(command_message)
 
     def _log_result(self, result: Union[List[BaseModel], BaseModel]) -> None:
@@ -117,66 +168,35 @@ class AsyncXR:
             return
         result_message = ChatMessage.from_user(
             result.model_dump_json(),
-            mimetype=model_cls_to_mimetype[type(result)])
+            # mimetype=model_cls_to_mimetype[type(result)]
+        )
         self.session.chat.append(result_message)
 
     async def write(self, *text, title=None, key=None) -> None:
-        await self._execute(WriteCommand, *text, title=title, key=key)
+        await self.execute(WriteCommand, *text, title=title, key=key)
 
     async def say(self, *text, title=None, key=None) -> None:
-        await self._execute(SayCommand, *text, title=title, key=key)
+        await self.execute(SayCommand, *text, title=title, key=key)
 
     async def sense(self, eye=None, head=None, hands=None, image=None, depth=None) -> SenseResult:
-        return await self._execute(SenseCommand, eye=eye, head=head, hands=hands, image=image, depth=depth)
-
-    async def clear(self):
-        return await self._execute(ClearCommand)
+        return await self.execute(SenseCommand, eye=eye, head=head, hands=hands, image=image, depth=depth)
 
     async def read(self, *text, title=None, key=None) -> str:
         if text or title:
-            await self._execute(WriteCommand, *text, title=title, key=key)
-        return await self._execute(ReadCommand)
+            await self.execute(WriteCommand, *text, title=title, key=key)
+        return await self.execute(ReadCommand)
 
     async def image(self) -> Image:
-        return await self._execute(ImageCommand)
+        return await self.execute(ImageCommand)
 
     async def depth(self) -> Image:
-        return await self._execute(DepthCommand)
+        return await self.execute(DepthCommand)
 
     async def eye(self) -> Transform:
-        return await self._execute(EyeCommand)
-
-    async def display(self,
-                      image: Image = None,
-                      depth: float = .48725,
-                      opacity: float = 1,
-                      eye=None,
-                      visible=True,
-                      key=None) -> None:
-        await self._execute(DisplayCommand, image=image, depth=depth, opacity=opacity, eye=eye, visible=visible,
-                            key=key)
+        return await self.execute(EyeCommand)
 
     async def hands(self) -> Hands:
-        return await self._execute(HandsCommand)
-
-    async def sphere(self,
-                     position: FloatArrayLike,
-                     scale: float = .1,
-                     color: FloatArrayLike = (1, 1, 1, 1),
-                     key=None) -> None:
-        await self._execute(SphereCommand, position, scale=scale, color=color, key=key)
-
-    async def save(self, *keys) -> None:
-        await self._execute(SaveCommand, *keys)
-
-    async def load(self, *keys) -> None:
-        await self._execute(LoadCommand, *keys)
-
-    async def glb(self, data, position) -> None:
-        await self._execute(GLBCommand, data, position)
-
-    async def info(self) -> DeviceInfo:
-        return await self._execute(InfoCommand)
+        return await self.execute(HandsCommand)
 
     def as_mcp_server(self):
         mcp = FastMCP('XARP')
@@ -250,7 +270,7 @@ class XR:
     def hands(self) -> Hands:
         return self._sync(self.as_async.hands)
 
-    def sphere(self, position: FloatArrayLike, scale=.1, color: FloatArrayLike = (1, 1, 1, 1), key=None) -> None:
+    def sphere(self, position: Vector3, scale=.1, color = (1, 1, 1, 1), key=None) -> None:
         return self._sync(self.as_async.sphere, position, scale=scale, color=color, key=key)
 
     def save(self, *keys) -> None:
@@ -379,4 +399,27 @@ def run_xr_app(
         host=settings.host,
         port=settings.port)
 
+
 # def run_agent(xr_app: Callable[[XR, ], None], session_repository: SessionRepository):
+
+
+def run_xr(xr_app: Callable[[RemoteXRClient], Awaitable]) -> None:
+    app = FastAPI()
+
+    async def entrypoint(
+            ws: WebSocket,
+            user_id: str,
+            session_ts: int = None):
+        await ws.accept()
+        async with RemoteXRClient(ws) as xr:
+            await xr_app(xr)
+        await ws.close()
+
+    app.add_api_websocket_route(
+        settings.ws_route,
+        entrypoint)
+
+    uvicorn.run(
+        app,
+        host=settings.host,
+        port=settings.port)
