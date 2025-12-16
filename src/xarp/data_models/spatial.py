@@ -1,11 +1,10 @@
 import math
-from typing import Any, Optional
-from typing import Iterable, Tuple, Union, List
+from typing import Iterable
+from typing import Optional
 
 import numpy as np
 from pydantic import BaseModel, Field
 from pydantic import RootModel
-from pydantic import field_validator, model_validator, ConfigDict, field_serializer
 
 
 class Vector3(RootModel[list[float]]):
@@ -72,28 +71,34 @@ class Vector3(RootModel[list[float]]):
         return self.__mul__(scalar)
 
 
-class Quaternion(RootModel[list[float]]):
-    @classmethod
-    def from_wxyz(cls, w: float, x: float, y: float, z: float) -> 'Quaternion':
-        return cls([float(w), float(x), float(y), float(z)])
+import numpy as np
+import math
 
-    @property
-    def w(self) -> float:
-        return self.root[0]
+
+class Quaternion(RootModel[list[float]]):
+
+    @classmethod
+    def from_xyzw(cls, x: float, y: float, z: float, w: float) -> 'Quaternion':
+        return cls([float(x), float(y), float(z), float(w)])
 
     @property
     def x(self) -> float:
-        return self.root[1]
+        return self.root[0]
 
     @property
     def y(self) -> float:
-        return self.root[2]
+        return self.root[1]
 
     @property
     def z(self) -> float:
+        return self.root[2]
+
+    @property
+    def w(self) -> float:
         return self.root[3]
 
     def to_numpy(self) -> np.ndarray:
+        # Returns in xyzw order
         return np.array(self.root, dtype=float)
 
     def norm(self) -> float:
@@ -112,7 +117,79 @@ class Quaternion(RootModel[list[float]]):
 
     @staticmethod
     def identity() -> 'Quaternion':
-        return Quaternion([1.0, 0.0, 0.0, 0.0])
+        return Quaternion([0.0, 0.0, 0.0, 1.0])
+
+    def to_euler_angles(self, degrees=True) -> Vector3:
+        """
+        Returns XYZ Euler angles (roll, pitch, yaw) in radians.
+        """
+        q = self.normalized()
+        x, y, z, w = q.x, q.y, q.z, q.w
+
+        # Roll (X-axis)
+        sinr_cosp = 2.0 * (w * x + y * z)
+        cosr_cosp = 1.0 - 2.0 * (x * x + y * y)
+        roll = math.atan2(sinr_cosp, cosr_cosp)
+
+        # Pitch (Y-axis)
+        sinp = 2.0 * (w * y - z * x)
+        if abs(sinp) >= 1.0:
+            pitch = math.copysign(math.pi / 2.0, sinp)  # gimbal lock
+        else:
+            pitch = math.asin(sinp)
+
+        # Yaw (Z-axis)
+        siny_cosp = 2.0 * (w * z + x * y)
+        cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
+        yaw = math.atan2(siny_cosp, cosy_cosp)
+
+        if degrees:
+            return Vector3([
+                math.degrees(roll),
+                math.degrees(pitch),
+                math.degrees(yaw),
+            ])
+        return Vector3([roll, pitch, yaw])
+
+    def to_rotation_matrix(self) -> np.ndarray:
+        """
+        Returns a 3x3 rotation matrix.
+        right-handed rotation.
+        """
+        q = self.normalized()
+        x, y, z, w = q.x, q.y, q.z, q.w
+
+        xx = x * x
+        yy = y * y
+        zz = z * z
+        xy = x * y
+        xz = x * z
+        yz = y * z
+        wx = w * x
+        wy = w * y
+        wz = w * z
+
+        return np.array([
+            [1.0 - 2.0 * (yy + zz), 2.0 * (xy - wz), 2.0 * (xz + wy)],
+            [2.0 * (xy + wz), 1.0 - 2.0 * (xx + zz), 2.0 * (yz - wx)],
+            [2.0 * (xz - wy), 2.0 * (yz + wx), 1.0 - 2.0 * (xx + yy)],
+        ], dtype=float)
+
+    def inverse(self) -> 'Quaternion':
+        """
+        Returns the inverse of the quaternion.
+        For unit quaternions, this is just the conjugate.
+        """
+        x, y, z, w = self.x, self.y, self.z, self.w
+        n2 = x * x + y * y + z * z + w * w
+        if n2 == 0.0:
+            raise ValueError("Cannot invert zero quaternion")
+        return Quaternion([
+            -x / n2,
+            -y / n2,
+            -z / n2,
+            w / n2,
+        ])
 
 
 class Pose(BaseModel):
@@ -142,21 +219,11 @@ class Transform(Pose):
     scale: Vector3 = Field(default_factory=Vector3.one)
 
     def to_matrix(self) -> np.ndarray:
-        # Scale matrix
-        S = np.eye(4)
-        S[0, 0] = self.scale.x
-        S[1, 1] = self.scale.y
-        S[2, 2] = self.scale.z
-
-        # Rotation matrix
-        R = self.rotation.to_rotation_matrix()
-
-        # Translation matrix
-        T = np.eye(4)
-        T[:3, 3] = np.asarray(self.position, dtype=float)
-
-        # Combine (T * R * S)
-        return T @ R @ S
+        matrix = super().to_matrix()
+        matrix[0, 0] = self.scale[0]
+        matrix[1, 1] = self.scale[1]
+        matrix[2, 2] = self.scale[2]
+        return matrix
 
     def world_matrix(self) -> np.ndarray:
         M = self.to_matrix()
@@ -167,6 +234,34 @@ class Transform(Pose):
 
 def distance(a: Vector3, b: Vector3):
     return np.linalg.norm(a.to_numpy() - b.to_numpy())
+
+
+def angle_quaternion(q1: Quaternion, q2: Quaternion, degrees: bool = True) -> float:
+    """
+    Returns the smallest rotation angle between two quaternions.
+    This is the geodesic distance on SO(3).
+    """
+    q1 = q1.normalized()
+    q2 = q2.normalized()
+
+    # Relative rotation: q_rel = q1^{-1} * q2
+    x1, y1, z1, w1 = q1.x, q1.y, q1.z, q1.w
+    x2, y2, z2, w2 = q2.x, q2.y, q2.z, q2.w
+
+    # Quaternion multiplication (inverse(q1) * q2)
+    w = w1 * w2 + x1 * x2 + y1 * y2 + z1 * z2
+    x = w1 * x2 - x1 * w2 - y1 * z2 + z1 * y2
+    y = w1 * y2 + x1 * z2 - y1 * w2 - z1 * x2
+    z = w1 * z2 - x1 * y2 + y1 * x2 - z1 * w2
+
+    # Clamp for numerical safety
+    w = max(-1.0, min(1.0, abs(w)))
+
+    angle = 2.0 * math.acos(w)
+
+    if degrees:
+        return math.degrees(angle)
+    return angle
 
 
 def cosine_similarity(a: Vector3, b: Vector3):

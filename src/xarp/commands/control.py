@@ -1,8 +1,8 @@
 from typing import Literal, Any, Annotated
-from pydantic import Field
+from pydantic import Field, JsonValue
 
 from xarp import ImageCommand, DepthCommand, EyeCommand
-from xarp.commands.sense import HeadCommand, HandsCommand
+from xarp.commands.sensing import HeadCommand, HandsCommand
 from xarp.data_models.data import DeviceInfo
 from xarp.commands import XRCommand, CancelCommand
 from xarp.commands.assets import AssetCommand, ElementCommand, DestroyAssetCommand, DestroyElementCommand
@@ -10,9 +10,9 @@ from xarp.commands.ui import WriteCommand, SayCommand, ReadCommand
 
 
 class InfoCommand(XRCommand):
-    cmd: Literal['info'] = Field('info', frozen=True)
+    cmd: Literal['info'] = Field(default='info', frozen=True)
 
-    def validate_response(self, json_data: dict) -> DeviceInfo:
+    def validate_response(self, json_data: JsonValue) -> DeviceInfo:
         return DeviceInfo.model_validate(json_data)
 
 
@@ -26,8 +26,8 @@ AllowedBundleCommands = Annotated[
 
 
 class BundleCommand(XRCommand):
-    cmd: Literal['bundle'] = Field('bundle', frozen=True)
+    cmd: Literal['bundle'] = Field(default='bundle', frozen=True)
     subcommands: list[AllowedBundleCommands] = Field(default_factory=list)
 
-    def validate_response(self, json_data: list[Any]) -> list[Any]:
+    def validate_response(self, json_data: list[JsonValue]) -> list[Any]:
         return [sub.validate_response(item) for sub, item in zip(self.subcommands, json_data)]

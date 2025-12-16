@@ -1,18 +1,10 @@
-import base64
 import mimetypes
-import mimetypes
-import pathlib
 from enum import Enum
-from io import BytesIO
-from os import PathLike
-from typing import Tuple, Optional, ClassVar, IO, Any
+from typing import Tuple
 
-import PIL
-import PIL.Image as PIL_Image
 import numpy as np
-from pydantic import BaseModel, Field, ConfigDict, RootModel, field_serializer
+from pydantic import BaseModel, Field, ConfigDict
 
-from xarp.data_models.encoding import LazyBase64Bytes
 from xarp.data_models.spatial import Transform, Pose, Vector3
 
 
@@ -43,57 +35,6 @@ class Hands(BaseModel):
         yield self.right
 
 
-class Image(BaseModel):
-    pixels: LazyBase64Bytes | None = None
-    width: int
-    height: int
-    pil_img_mode: str = 'RGBA'
-    path: pathlib.PurePath | None = None
-
-    @property
-    def size(self) -> Tuple[int, int]:
-        return self.width, self.height
-
-    def load_pixels(self, scale: float = None) -> 'Image':
-        img = PIL_Image.open(self.path)
-        self.width, self.height = img.size
-        if scale is not None:
-            img.thumbnail((self.width * scale, self.height * scale))
-        self.pixels = LazyBase64Bytes(img.tobytes())
-        self.path = None
-        return self
-
-    def dump_pixels(self, path: pathlib.PurePath) -> 'Image':
-        pil_img = self.to_pil_image()
-        with open(path, 'wb') as f:
-            pil_img.save(path)
-        self.pixels = None
-        self.path = path
-        return self
-
-    def to_pil_image(self) -> PIL_Image.Image:
-        if self.path:
-            return PIL_Image.open(self.path)
-        temp = BytesIO(self.pixels)
-        return PIL_Image.open(temp)
-
-    @classmethod
-    def from_pil_image(cls, source: PIL_Image.Image) -> 'Image':
-        return Image(
-            pixels=LazyBase64Bytes(source.tobytes()),
-            pil_img_mode=source.mode,
-            height=source.height,
-            width=source.width)
-
-
-class SenseResult(BaseModel):
-    eye: Optional[Transform] = None
-    head: Optional[Transform] = None
-    image: Optional[Image] = None
-    depth: Optional[Image] = None
-    hands: Optional[Hands] = None
-
-
 class CameraIntrinsics(BaseModel):
     model_config = ConfigDict(
         frozen=True,
@@ -102,7 +43,7 @@ class CameraIntrinsics(BaseModel):
     focal_length: Tuple[float, float] = None
     principal_point: Tuple[float, float] = None
     sensor_resolution: Tuple[float, float] = None
-    lens_offset: Transform
+    lens_offset: Pose
 
     def to_matrix(self) -> np.ndarray:
         fx, fy = self.focal_length

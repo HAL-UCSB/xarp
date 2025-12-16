@@ -9,26 +9,25 @@ async def capture(xr: RemoteXRClient):
     repo = SessionRepositoryLocalFileSystem(settings.local_storage)
     session = Session(user_id='expert')
 
-    stream = await xr.execute(
-        BundleCommand(
-            subcommands=[
-                HandsCommand(),
-                EyeCommand(),
-                ImageCommand()
-            ],
-            response_mode=ResponseMode.STREAM,
-        )
+    stream_command = BundleCommand(
+        subcommands=[
+            HandsCommand(),
+            EyeCommand(),
+            ImageCommand()
+        ],
+        response_mode=ResponseMode.STREAM,
     )
 
-    i = 0
+    stream = await xr.execute(stream_command)
+
+    frame_count = 0
     try:
         start = utc_ts()
         async for frame in stream:
             session.chat.append(ChatMessage.from_user(frame))
-            print(i)
-            i += 1
-        end = utc_ts()
-        print(i / (end - start), 'FPS')
+            frame_count += 1
+            print(frame_count)
+        print(frame_count / (utc_ts() - start), ' FPS')
     finally:
         repo.save(session)
 

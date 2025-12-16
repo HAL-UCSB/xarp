@@ -1,5 +1,5 @@
 from typing import Literal
-from pydantic import Field
+from pydantic import Field, JsonValue
 from xarp.commands import XRCommand
 
 
@@ -16,5 +16,5 @@ class SayCommand(WriteCommand):
 class ReadCommand(WriteCommand):
     cmd: Literal['read'] = Field('read', frozen=True)
 
-    def validate_response(self, json_data: dict) -> str:
+    def validate_response(self, json_data: JsonValue) -> str:
         return str(json_data)

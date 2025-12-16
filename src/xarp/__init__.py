@@ -9,12 +9,13 @@ from pydantic import BaseModel
 from starlette.websockets import WebSocketDisconnect
 
 from xarp.auth import settings_file_authorization
-from xarp.commands.sense import SenseCommand, ImageCommand, DepthCommand, EyeCommand, HandsCommand
+from xarp.commands.sensing import ImageCommand, DepthCommand, EyeCommand, HandsCommand
 from xarp.commands.ui import WriteCommand, SayCommand, ReadCommand
+from xarp.data_models.binaries import ImageResource
 from xarp.data_models.chat import ChatMessage
 from xarp.commands import XRCommand, XRResponse, ResponseMode, CancelCommand
 from xarp.data_models.entities import Session
-from xarp.data_models.data import Hands, Image, SenseResult, DeviceInfo
+from xarp.data_models.data import Hands, DeviceInfo
 from xarp.data_models.spatial import Transform, Vector3
 from xarp.settings import settings
 from xarp.storage import SessionRepository
@@ -178,18 +179,15 @@ class AsyncXR(RemoteXRClient):
     async def say(self, *text, title=None, key=None) -> None:
         await self.execute(SayCommand, *text, title=title, key=key)
 
-    async def sense(self, eye=None, head=None, hands=None, image=None, depth=None) -> SenseResult:
-        return await self.execute(SenseCommand, eye=eye, head=head, hands=hands, image=image, depth=depth)
-
     async def read(self, *text, title=None, key=None) -> str:
         if text or title:
             await self.execute(WriteCommand, *text, title=title, key=key)
         return await self.execute(ReadCommand)
 
-    async def image(self) -> Image:
+    async def image(self) -> ImageResource:
         return await self.execute(ImageCommand)
 
-    async def depth(self) -> Image:
+    async def depth(self) -> ImageResource:
         return await self.execute(DepthCommand)
 
     async def eye(self) -> Transform:
@@ -249,17 +247,17 @@ class XR:
     def read(self, text=None, title=None, key=None) -> str:
         return self._sync(self.as_async.read, text, title=title, key=key)
 
-    def image(self) -> Image:
+    def image(self) -> ImageResource:
         return self._sync(self.as_async.image)
 
-    def depth(self) -> Image:
+    def depth(self) -> ImageResource:
         return self._sync(self.as_async.depth)
 
     def eye(self) -> Transform:
         return self._sync(self.as_async.eye)
 
     def display(self,
-                image: Image = None,
+                image: ImageResource = None,
                 depth: float = .48725,
                 opacity: float = 1,
                 eye=None,
@@ -270,7 +268,7 @@ class XR:
     def hands(self) -> Hands:
         return self._sync(self.as_async.hands)
 
-    def sphere(self, position: Vector3, scale=.1, color = (1, 1, 1, 1), key=None) -> None:
+    def sphere(self, position: Vector3, scale=.1, color=(1, 1, 1, 1), key=None) -> None:
         return self._sync(self.as_async.sphere, position, scale=scale, color=color, key=key)
 
     def save(self, *keys) -> None:

@@ -12,17 +12,13 @@ class ResponseMode(IntEnum):
 
 
 class XRCommand(BaseModel):
-    model_config = ConfigDict(
-        extra='forbid'
-    )
-    cmd: Literal[None] = None
-    ts: int = Field(default_factory=utc_ts)
     xid: int = None
-    delay: int | None = None
-
+    ts: int = Field(default_factory=utc_ts)
+    delay: int = -1
     response_mode: ResponseMode = ResponseMode.SINGLE
+    model_config = ConfigDict(extra='forbid')
 
-    def validate_response(self, json_data: dict) -> Any:
+    def validate_response(self, json_data: JsonValue) -> Any:
         return json_data
 
     @property
@@ -37,7 +33,6 @@ class XRResponse(BaseModel):
 
 
 class CancelCommand(XRCommand):
-    cmd: Literal['cancel'] = Field('cancel', frozen=True)
+    cmd: Literal['cancel'] = Field(default='cancel', frozen=True)
     target_xid: int
-
     response_mode: ResponseMode = ResponseMode.NONE

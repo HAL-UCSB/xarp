@@ -52,7 +52,7 @@ class BinaryResource(ABC, BaseModel):
             inst = cls(mode='file', path=path)
         return inst
 
-    def to_file(self, path: str | Path | None = None, *, overwrite: bool = True) -> None:
+    def to_file(self, path: str | Path | None = None, *, overwrite: bool = True) -> 'BinaryResource':
         obj = self._require_obj()
 
         if path is None:
@@ -71,8 +71,9 @@ class BinaryResource(ABC, BaseModel):
         self.path = path
         self._obj = None
         self.mode = 'file'
+        return self
 
-    def to_memory(self) -> None:
+    def to_memory(self) -> 'BinaryResource':
         if self._obj is None:
             if self.path is None:
                 raise RuntimeError('Cannot load into memory; no path set.')
@@ -80,6 +81,8 @@ class BinaryResource(ABC, BaseModel):
                 raw = f.read()
             self._obj = self._decode_obj(raw)
         self.mode = 'memory'
+        self.path = None
+        return self
 
     def _require_obj(self) -> Any:
         if self._obj is None:

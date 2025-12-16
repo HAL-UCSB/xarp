@@ -53,8 +53,8 @@ class SessionRepositoryLocalFileSystem(SessionRepository):
                     content.to_file(bin_path)
                     i += 1
 
-        with chat_path.open('w', encoding='utf-8') as f:
-            f.write(session.model_dump_json())
+        session_json = session.model_dump_json()
+        chat_path.write_text(session_json, encoding='utf-8')
 
 
 class UserRepositoryLocalFileSystem(UserRepository):
