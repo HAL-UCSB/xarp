@@ -5,7 +5,7 @@ from xarp import ImageCommand, DepthCommand, EyeCommand
 from xarp.commands.sensing import HeadCommand, HandsCommand
 from xarp.data_models.data import DeviceInfo
 from xarp.commands import XRCommand, CancelCommand
-from xarp.commands.assets import AssetCommand, ElementCommand, DestroyAssetCommand, DestroyElementCommand
+from xarp.commands.assets import AssetCommand, Element, DestroyAssetCommand, DestroyElementCommand
 from xarp.commands.ui import WriteCommand, SayCommand, ReadCommand
 
 
@@ -17,7 +17,7 @@ class InfoCommand(XRCommand):
 
 
 AllowedBundleCommands = Annotated[
-    AssetCommand | ElementCommand | DestroyAssetCommand | DestroyElementCommand |
+    AssetCommand | Element | DestroyAssetCommand | DestroyElementCommand |
     WriteCommand | SayCommand | ReadCommand |
     CancelCommand |
     ImageCommand | DepthCommand | HeadCommand | EyeCommand | HandsCommand,

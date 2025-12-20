@@ -1,5 +1,5 @@
 from xarp import run_xr, RemoteXRClient, HandsCommand, ResponseMode, EyeCommand, ImageCommand, \
-    SessionRepositoryLocalFileSystem, settings, ChatMessage
+    SessionRepositoryLocalFileSystem, settings, ChatMessage, SayCommand
 from xarp.commands.control import BundleCommand
 from xarp.data_models.entities import Session
 from xarp.time import utc_ts
@@ -18,6 +18,8 @@ async def capture(xr: RemoteXRClient):
         response_mode=ResponseMode.STREAM,
     )
 
+    await xr.execute(SayCommand(text='Start capturing'))
+
     stream = await xr.execute(stream_command)
 
     frame_count = 0
@@ -30,6 +32,7 @@ async def capture(xr: RemoteXRClient):
         print(frame_count / (utc_ts() - start), ' FPS')
     finally:
         repo.save(session)
+        print('data saved')
 
 
 if __name__ == '__main__':

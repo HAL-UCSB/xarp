@@ -55,8 +55,20 @@ class Vector3(RootModel[list[float]]):
             self.root[2] + other.root[2],
         ])
 
+    def __sub__(self, other: 'Vector3') -> 'Vector3':
+        if not isinstance(other, Vector3):
+            return NotImplemented
+        return Vector3([
+            self.root[0] - other.root[0],
+            self.root[1] - other.root[1],
+            self.root[2] - other.root[2],
+        ])
+
     def __radd__(self, other: 'Vector3') -> 'Vector3':
         return self.__add__(other)
+
+    def __rsub__(self, other: 'Vector3') -> 'Vector3':
+        return self.__sub__(other)
 
     def __mul__(self, scalar: float) -> 'Vector3':
         if not isinstance(scalar, (int, float)):
@@ -69,10 +81,6 @@ class Vector3(RootModel[list[float]]):
 
     def __rmul__(self, scalar: float) -> 'Vector3':
         return self.__mul__(scalar)
-
-
-import numpy as np
-import math
 
 
 class Quaternion(RootModel[list[float]]):
@@ -306,3 +314,30 @@ def convex_hull_2d(points: np.ndarray) -> np.ndarray:
     # Concatenate lower + upper, removing the last point of each (they repeat)
     hull = lower[:-1] + upper[:-1]
     return np.array(hull, dtype=np.float64)
+
+
+def point_to_ray_distance(point: Vector3, pose: Pose) -> float:
+    local_ray_dir = Vector3.from_xyz(0, 0, 1)
+
+    o = pose.position.to_numpy()
+    p = point.to_numpy()
+
+    # World direction from pose rotation
+    R = pose.rotation.to_rotation_matrix()
+    d = R @ local_ray_dir.to_numpy()
+
+    d_norm = float(np.linalg.norm(d))
+    if d_norm == 0.0:
+        raise ValueError("Ray direction is zero after rotation (invalid local_ray_dir or rotation).")
+    d = d / d_norm
+
+    v = p - o
+    t = float(np.dot(v, d))  # projection onto direction
+
+    if t <= 0.0:
+        # closest point is the ray origin
+        return float(np.linalg.norm(v))
+
+    # closest point is o + t d
+    closest = o + t * d
+    return float(np.linalg.norm(p - closest))

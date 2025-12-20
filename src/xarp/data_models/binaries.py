@@ -3,7 +3,7 @@ import base64
 from abc import ABC, abstractmethod
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Literal, ClassVar
+from typing import Any, Literal, ClassVar, Text
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr, model_serializer
 from PIL import Image
@@ -123,7 +123,7 @@ class ImageResource(BinaryResource):
 
     def _encode_obj(self, obj: Image.Image) -> bytes:
         buf = BytesIO()
-        obj.save(buf, format=ImageResource.format)
+        obj.convert('RGBA').save(buf, format=ImageResource.format)
         return buf.getvalue()
 
     def _decode_obj(self, data: bytes) -> Image.Image:
@@ -132,3 +132,14 @@ class ImageResource(BinaryResource):
     @classmethod
     def from_image(cls, image: Image.Image) -> 'ImageResource':
         return cls.from_obj(image)
+
+
+class TextResource(BinaryResource):
+    mime_type: ClassVar[str] = 'text/plain'
+    _obj: str | None = PrivateAttr(default=None)
+
+    def _encode_obj(self, obj: str) -> bytes:
+        return str.encode(obj, 'utf-8')
+
+    def _decode_obj(self, data: bytes) -> str:
+        return data.decode('utf-8')

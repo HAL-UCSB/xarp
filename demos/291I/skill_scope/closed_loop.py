@@ -1,83 +1,80 @@
 from xarp import run_xr, RemoteXRClient
 from xarp.commands import ResponseMode
-from xarp.commands.assets import ElementCommand, DefaultAssets
+from xarp.commands.assets import Element, DefaultAssets
 from xarp.commands.control import BundleCommand
-from xarp.commands.sensing import HandsCommand, EyeCommand, ImageCommand
+from xarp.commands.sensing import HandsCommand, EyeCommand, ImageCommand, HeadCommand
 from xarp.data_models.spatial import Transform, Vector3
 from xarp.time import utc_ts
 
 
 async def closed_loop(xr: RemoteXRClient):
-    left_sphere = 'left_sphere'
-    right_sphere = 'right_sphere'
-    display = 'display'
-    bundle = []
-    last_ts = None
+    left_marker = Element(
+        key='left_marker',
+        asset_key=DefaultAssets.SPHERE,
+        color=(1, 0, 0, 1),
+    )
 
-    stream_command = BundleCommand(
+    right_marker = Element(
+        key='right_marker',
+        asset_key=DefaultAssets.SPHERE,
+        color=(0, 1, 0, 1),
+    )
+
+    image_panel = Element(
+        key='image_panel',
+        distance=.489
+    )
+
+    scene = BundleCommand(
+        subcommands=[
+            left_marker,
+            right_marker,
+            image_panel
+        ],
+        response_mode=ResponseMode.NONE
+    )
+
+    tracking_command = BundleCommand(
         subcommands=[
             HandsCommand(),
             EyeCommand(),
-            ImageCommand()
+            ImageCommand(),
         ],
         response_mode=ResponseMode.STREAM,
+        # delay=1 / 4
     )
 
-    stream = await xr.execute(stream_command)
+    tracking = await xr.execute(tracking_command)
 
-    async for frame in stream:
-        bundle.clear()
-        hands, eye, image = frame
+    last_ts = None
+    try:
+        async for frame in tracking:
+            hands, eye, image = frame
 
-        now = utc_ts()
-        if last_ts is not None and now > last_ts:
-            print(1.0 / (now - last_ts), ' FPS')
-        last_ts = now
+            now = utc_ts()
+            if last_ts is not None and now > last_ts:
+                pass
+                print(1.0 / (now - last_ts), ' FPS')
+            last_ts = now
 
-        if hands.left:
-            show_left_hand = ElementCommand(
-                key=left_sphere,
-                asset_key=DefaultAssets.SPHERE,
-                active=True,
-                transform=Transform(
+            left_marker.active = bool(hands.left)
+            if left_marker.active:
+                left_marker.transform = Transform(
                     position=hands.left[0].position,
                     scale=Vector3.one() * .05)
-            )
-            bundle.append(show_left_hand)
-        else:
-            hide_left_hand = ElementCommand(
-                key=left_sphere,
-                active=False
-            )
-            bundle.append(hide_left_hand)
 
-        if hands.right:
-            show_right_hand = ElementCommand(
-                key=right_sphere,
-                asset_key=DefaultAssets.SPHERE,
-                active=True,
-                transform=Transform(
+            right_marker.active = bool(hands.right)
+            if right_marker.active:
+                right_marker.transform = Transform(
                     position=hands.right[0].position,
                     scale=Vector3.one() * .05)
-            )
-            bundle.append(show_right_hand)
-        else:
-            hide_right_hand = ElementCommand(
-                key=right_sphere,
-                active=False
-            )
-            bundle.append(hide_right_hand)
 
-        show_image = ElementCommand(
-            key=display,
-            binary=image,
-            active=True,
-            eye=eye,
-            distance=.49
-        )
-        bundle.append(show_image)
+            image_panel.binary = image
+            image_panel.eye = eye
 
-        await xr.execute(BundleCommand(subcommands=bundle, response_mode=ResponseMode.NONE))
+            await xr.execute(scene)
+    finally:
+        await tracking.aclose()
 
 
 if __name__ == '__main__':

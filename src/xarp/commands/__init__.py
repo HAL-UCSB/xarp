@@ -14,7 +14,7 @@ class ResponseMode(IntEnum):
 class XRCommand(BaseModel):
     xid: int = None
     ts: int = Field(default_factory=utc_ts)
-    delay: int = -1
+    delay: float = -1
     response_mode: ResponseMode = ResponseMode.SINGLE
     model_config = ConfigDict(extra='forbid')
 

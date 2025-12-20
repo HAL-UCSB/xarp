@@ -5,13 +5,13 @@ from pydantic import Field, model_validator, JsonValue
 
 from xarp.commands import XRCommand
 from xarp.data_models.binaries import BinaryResource
-from xarp.data_models.data import MIMEType
 from xarp.data_models.spatial import Transform, Pose
 
 
 class DefaultAssets(str, Enum):
     SPHERE = 'Sphere'
     CUBE = 'Cube'
+    SOLID_BACKGROUND = 'Solid Background'
 
 
 class AssetCommand(XRCommand):
@@ -24,12 +24,12 @@ class ListAssetsCommand(XRCommand):
     cmd: Literal['list_assets'] = Field(default='list_assets', frozen=True)
 
     def validate_response(self, json_data: list[JsonValue]) -> list[str]:
-        return json_data
+        return [str(i) for i in json_data]
 
 
 class DestroyAssetCommand(XRCommand):
     cmd: Literal['destroy_asset'] = Field(default='destroy_asset', frozen=True)
-    asset_key: str | None = None
+    asset_key: list[str] | str | None = None
     all: bool = False
 
     @model_validator(mode='after')
@@ -39,11 +39,11 @@ class DestroyAssetCommand(XRCommand):
                 raise ValueError('When "all" is True, "asset_key" must not be provided.')
             return self
         if not self.asset_key:
-            raise ValueError('When "all" is False, "asset_key" must be a non-empty string.')
+            raise ValueError('When "all" is False, "asset_key" must be a non-empty string or list.')
         return self
 
 
-class ElementCommand(XRCommand):
+class Element(XRCommand):
     cmd: Literal['element'] = Field(default='element', frozen=True)
     key: str
 

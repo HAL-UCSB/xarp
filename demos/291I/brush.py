@@ -1,5 +1,5 @@
 from xarp import run_xr, RemoteXRClient, HandsCommand, ResponseMode
-from xarp.commands.assets import ElementCommand, DefaultAssets, DestroyElementCommand
+from xarp.commands.assets import Element, DefaultAssets, DestroyElementCommand
 from xarp.data_models.spatial import Transform, Vector3
 from xarp.gestures import pinch, INDEX_TIP
 
@@ -18,7 +18,7 @@ async def brush(xr: RemoteXRClient):
             i += 1
             point = hands.right[INDEX_TIP]
             await xr.execute(
-                ElementCommand(
+                Element(
                     asset_key=DefaultAssets.SPHERE,
                     key=str(i),
                     transform=Transform(

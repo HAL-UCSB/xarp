@@ -1,6 +1,6 @@
 from xarp import run_xr, RemoteXRClient, SessionRepositoryLocalFileSystem, \
     settings, ResponseMode
-from xarp.commands.assets import ElementCommand
+from xarp.commands.assets import Element
 from xarp.commands.control import BundleCommand
 from xarp.data_models.spatial import Transform, Vector3
 
@@ -20,7 +20,7 @@ async def playback(xr: RemoteXRClient):
         hands, eye, image = message.content
 
         if hands.left:
-            show_left_hand = ElementCommand(
+            show_left_hand = Element(
                 key=left_sphere,
                 asset_key='Sphere',
                 active=True,
@@ -31,7 +31,7 @@ async def playback(xr: RemoteXRClient):
             )
             bundle.append(show_left_hand)
         else:
-            hide_left_hand = ElementCommand(
+            hide_left_hand = Element(
                 key=left_sphere,
                 active=False,
                 response_mode=ResponseMode.NONE
@@ -39,7 +39,7 @@ async def playback(xr: RemoteXRClient):
             bundle.append(hide_left_hand)
 
         if hands.right:
-            show_right_hand = ElementCommand(
+            show_right_hand = Element(
                 key=right_sphere,
                 asset_key='Sphere',
                 active=True,
@@ -50,7 +50,7 @@ async def playback(xr: RemoteXRClient):
             )
             bundle.append(show_right_hand)
         else:
-            hide_right_hand = ElementCommand(
+            hide_right_hand = Element(
                 key=right_sphere,
                 active=False,
                 response_mode=ResponseMode.NONE
@@ -58,7 +58,7 @@ async def playback(xr: RemoteXRClient):
             bundle.append(hide_right_hand)
 
         image.to_memory()
-        show_image = ElementCommand(
+        show_image = Element(
             key=display,
             binary=image,
             active=True,
