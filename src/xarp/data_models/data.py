@@ -5,7 +5,7 @@ from typing import Tuple
 import numpy as np
 from pydantic import BaseModel, Field, ConfigDict
 
-from xarp.data_models.spatial import Transform, Pose, Vector3
+from xarp.data_models.spatial import Transform, Pose, Vector3, Quaternion
 
 
 class MIMEType(str, Enum):
@@ -36,76 +36,100 @@ class Hands(BaseModel):
 
 
 class CameraIntrinsics(BaseModel):
-    model_config = ConfigDict(
-        frozen=True,
-        arbitrary_types_allowed=True)
+    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
-    focal_length: Tuple[float, float] = None
-    principal_point: Tuple[float, float] = None
-    sensor_resolution: Tuple[float, float] = None
-    lens_offset: Pose
+    focal_length: Tuple[float, float]
+    principal_point: Tuple[float, float]
+    sensor_resolution: Tuple[float, float]
+    lens_offset: Pose | None = None  # interpreted as pixel offset in (cx,cy)
 
-    def to_matrix(self) -> np.ndarray:
+    def _fx_fy_cx_cy(self) -> tuple[float, float, float, float]:
         fx, fy = self.focal_length
         cx, cy = self.principal_point
-
-        K = np.array(
-            [
-                [fx, 0.0, cx],
-                [0.0, fy, cy],
-                [0.0, 0.0, 1.0],
-            ],
-            dtype=float,
-        )
-
         if self.lens_offset is not None:
-            du = float(self.lens_offset.position[0])
-            dv = float(self.lens_offset.position[1])
+            cx += float(self.lens_offset.position.x)
+            cy += float(self.lens_offset.position.y)
+        return float(fx), float(fy), float(cx), float(cy)
 
-            K[0, 2] += du
-            K[1, 2] -= dv
+    @staticmethod
+    def _world_to_cam(point_world: Vector3, cam_pose: Pose) -> tuple[float, float, float]:
+        R_cw = cam_pose.rotation.to_matrix()   # camera->world
+        C = cam_pose.position.to_numpy()
+        Xw = point_world.to_numpy()
+        x, y, z = (R_cw.T @ (Xw - C)).tolist()
+        return float(x), float(y), float(z)
 
-        return K
+    @staticmethod
+    def _intr_to_buffer(
+        u_intr: float,
+        v_intr: float,
+        intr_w: float,
+        intr_h: float,
+        img_w: int,
+        img_h: int,
+    ) -> np.ndarray:
+        # aspect-preserving scale then center-crop to the buffer
+        intr_aspect = intr_w / intr_h
+        img_aspect = img_w / img_h
 
-    def world_to_pixel(self,
-                       world_point: Vector3,
-                       camera_pose: Transform) -> Vector3:
-        wp = np.asarray(world_point, dtype=float)
-        single_point = (wp.ndim == 1)  # (3,)
-        if single_point:
-            wp = wp.reshape(1, 3)  # → (1,3)
+        if intr_aspect > img_aspect:
+            # scale by height, crop width
+            s = img_h / intr_h
+            crop_x = 0.5 * (intr_w * s - img_w)
+            u = u_intr * s - crop_x
+            v = v_intr * s
+        else:
+            # scale by width, crop height
+            s = img_w / intr_w
+            crop_y = 0.5 * (intr_h * s - img_h)
+            u = u_intr * s
+            v = v_intr * s - crop_y
 
-        # (N,3)
-        R_wc = np.asarray(camera_pose.rotation_matrix(), dtype=float).reshape(3, 3)
-        C = np.asarray(camera_pose.position, dtype=float).reshape(3)
+        return np.array([u, v], dtype=float)
 
-        R_cw = R_wc.T  # world→camera rotation
+    def world_to_pixel(self, point_world: Vector3, camera_pose: Pose) -> np.ndarray:
+        """
+        World point -> pixel in *intrinsics* pixel space (sensor_resolution grid).
+        """
+        fx, fy, cx, cy = self._fx_fy_cx_cy()
+        x, y, z = self._world_to_cam(point_world, camera_pose)
+        if z <= 0.0:
+            return np.array([np.nan, np.nan], dtype=float)
+        return np.array([fx * (x / z) + cx, cy - fy * (y / z)], dtype=float)
 
-        # World → camera
-        # (wp - C) → (N,3)
-        X_cam = (wp - C) @ R_cw.T  # still (N,3)
-        Xc = X_cam[:, 0]
-        Yc = X_cam[:, 1]
-        Zc = X_cam[:, 2]
+    def world_point_to_panel_pixel(
+        self,
+        point_world: Vector3,
+        eye: Pose,
+        image_width: int,
+        image_height: int,
+        distance: float,
+    ) -> np.ndarray:
+        """
+        World point -> pixel on the *displayed* image buffer drawn on a panel whose center is
+        at `eye.position + distance * forward(eye.rotation)` and whose normal is eye forward.
 
-        # Perspective divide
-        x = Xc / Zc
-        y = -Yc / Zc  # flip Y: camera (up) → image (down)
+        Uses: ray through point intersects plane z=distance (in eye coords), then intrinsics, then
+        aspect-preserving scale + center-crop into the delivered buffer size.
+        """
+        fx, fy, cx, cy = self._fx_fy_cx_cy()
+        intr_w, intr_h = map(float, self.sensor_resolution)
 
-        # Intrinsics
-        K = self.to_matrix()  # (3,3)
+        x, y, z = self._world_to_cam(point_world, eye)
+        if z <= 0.0:
+            return np.array([np.nan, np.nan], dtype=float)
 
-        # Homogeneous image coords
-        ones = np.ones_like(x)
-        pts_norm = np.column_stack((x, y, ones))  # (N,3)
+        # intersect the ray with plane z = distance in eye coords
+        t = float(distance) / z
+        xp = t * x
+        yp = t * y
 
-        uvw = pts_norm @ K.T  # (N,3)
-        u = uvw[:, 0] / uvw[:, 2]
-        v = uvw[:, 1] / uvw[:, 2]
+        # project to intrinsics pixel space (distance cancels)
+        u_intr = fx * (xp / float(distance)) + cx
+        v_intr = cy - fy * (yp / float(distance))
 
-        uv = np.column_stack((u, v))  # (N,2)
+        return self._intr_to_buffer(u_intr, v_intr, intr_w, intr_h, image_width, image_height)
 
-        return uv[0] if single_point else uv
 
 
 class DeviceInfo(BaseModel):

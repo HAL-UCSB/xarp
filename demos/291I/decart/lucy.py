@@ -41,7 +41,7 @@ async def connect_to_lucy():
     )
 
     # Create client
-    client = DecartClient(api_key="dev_sHbVosBxAYhaklyOtdgmxEEEttEYHVUbIgWjtvtculLBvrdARIrGyUQIBhOTrdND")
+    client = DecartClient(api_key="")
 
     # Connect to realtime API
     realtime_client = await RealtimeClient.connect(

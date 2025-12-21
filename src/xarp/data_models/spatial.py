@@ -159,7 +159,7 @@ class Quaternion(RootModel[list[float]]):
             ])
         return Vector3([roll, pitch, yaw])
 
-    def to_rotation_matrix(self) -> np.ndarray:
+    def to_matrix(self) -> np.ndarray:
         """
         Returns a 3x3 rotation matrix.
         right-handed rotation.
@@ -212,7 +212,7 @@ class Pose(BaseModel):
         S[2, 2] = 1
 
         # Rotation matrix
-        R = self.rotation.to_rotation_matrix()
+        R = self.rotation.to_matrix()
 
         # Translation matrix
         T = np.eye(4)
@@ -220,6 +220,12 @@ class Pose(BaseModel):
 
         # Combine (T * R * S)
         return T @ R @ S
+
+    def ray(self, d: float) -> Vector3:
+        forward = Vector3.from_xyz(0, 0, 1)
+        R = self.rotation.to_matrix()  # 3x3
+        world_dir = R @ forward.to_numpy()
+        return Vector3(self.position.to_numpy() + d * world_dir)
 
 
 class Transform(Pose):
@@ -323,7 +329,7 @@ def point_to_ray_distance(point: Vector3, pose: Pose) -> float:
     p = point.to_numpy()
 
     # World direction from pose rotation
-    R = pose.rotation.to_rotation_matrix()
+    R = pose.rotation.to_matrix()
     d = R @ local_ray_dir.to_numpy()
 
     d_norm = float(np.linalg.norm(d))
