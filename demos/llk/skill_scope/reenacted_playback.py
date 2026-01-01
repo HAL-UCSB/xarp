@@ -162,7 +162,7 @@ async def reenacted_playback(xr: RemoteXRClient):
 
             left_marker.color = (.5, .5, .5, 1 - transparency - .5)
             right_marker.color = (.5, .5, .5, 1 - transparency - .5)
-            image_panel.color = (1, 1, 1, transparency)
+            image_panel.color = (1, 1, 1, transparency * .75)
 
             await xr.execute(scene)
 

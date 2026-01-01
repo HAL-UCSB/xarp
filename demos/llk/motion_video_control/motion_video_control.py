@@ -91,7 +91,7 @@ async def motion_control(image: ImageResource, trajectory):
     image._obj.save(image_file, format='PNG')
     image_file.seek(0)
 
-    async with DecartClient(api_key="dev_sHbVosBxAYhaklyOtdgmxEEEttEYHVUbIgWjtvtculLBvrdARIrGyUQIBhOTrdND") as client:
+    async with DecartClient(api_key="dev_RebGKbuoDWDVGjOaBsuSgpHfVqMwjIHTwpRDOZYcWGeXuwUtNQnWWMyjWSxaJMEG") as client:
         token = await client.tokens.create()
 
         result = await client.queue.submit_and_poll({
@@ -202,7 +202,7 @@ async def app(xr: RemoteXRClient):
 
                 first_frame = True
                 async for frame in lucy_motion(picture, trajectory,
-                                               'API KEY'):
+                                               'dev_RebGKbuoDWDVGjOaBsuSgpHfVqMwjIHTwpRDOZYcWGeXuwUtNQnWWMyjWSxaJMEG'):
                     if first_frame:
                         first_frame = False
                         await xr.execute(SayCommand(text='Ready!', response_mode=ResponseMode.SINGLE))

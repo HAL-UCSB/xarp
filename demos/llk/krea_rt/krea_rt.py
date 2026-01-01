@@ -46,7 +46,7 @@ class GenerateParams(BaseModel):
 
 
 params = GenerateParams(
-    prompt="First-person perspective. You can blast power beams when you raise your hands.",
+    prompt="First-person perspective. Working on a workshop.",
     seed=42,
     strength=0.45,
     keep_first_frame=True,
@@ -55,7 +55,7 @@ params = GenerateParams(
     webcam_mode=True,
 )
 
-KREA_RT_SERVER_IP = "209.20.157.30"
+KREA_RT_SERVER_IP = "209.20.159.132"
 
 
 async def connect_to_krea_rt() -> ClientConnection:
