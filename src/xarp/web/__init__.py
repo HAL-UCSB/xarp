@@ -1,10 +1,7 @@
-from pathlib import Path
 import sys
 from streamlit.web import cli as stcli
 
 
 def run():
-    script = Path(__file__).parent / 'app.py'
-    print(script)
-    sys.argv = ['streamlit', 'run', str(script)]
+    sys.argv = ['streamlit', 'run', str('app.py')]
     sys.exit(stcli.main())

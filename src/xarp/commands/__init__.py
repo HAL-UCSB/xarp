@@ -1,38 +1,78 @@
+from abc import ABC
 from enum import IntEnum
+from typing import Any, Literal, Union, Annotated
+
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 from xarp.time import utc_ts
-from typing import Any, Literal
-from pydantic import BaseModel, Field, ConfigDict, JsonValue
+
+
+class MessageType(IntEnum):
+    NOTIFICATION = 0
+    SINGLE_RESPONSE = 1
+    STREAM_RESPONSE = 2
+    BUNDLE = 3
 
 
 class ResponseMode(IntEnum):
-    NONE = 0,
-    SINGLE = 1,
+    NONE = 0
+    SINGLE = 1
     STREAM = 2
 
 
-class XRCommand(BaseModel):
-    xid: int = None
-    ts: int = Field(default_factory=utc_ts)
-    delay: float = -1
-    response_mode: ResponseMode = ResponseMode.SINGLE
-    model_config = ConfigDict(extra='forbid')
-
-    def validate_response(self, json_data: JsonValue) -> Any:
-        return json_data
-
-    @property
-    def expects_response(self) -> bool:
-        return self.response_mode != ResponseMode.NONE
+class Notification(BaseModel):
+    type: Literal[MessageType.NOTIFICATION] = MessageType.NOTIFICATION
+    ts: int = utc_ts()
+    error: bool = False
+    value: Any | None = None
 
 
-class XRResponse(BaseModel):
-    ts: int = Field(default_factory=utc_ts)
+class SingleResponse(Notification):
+    type: Literal[MessageType.SINGLE_RESPONSE] = MessageType.SINGLE_RESPONSE
+    xid: int
+
+
+class StreamResponse(SingleResponse):
+    type: Literal[MessageType.STREAM_RESPONSE] = MessageType.STREAM_RESPONSE
+    seq: int = -1
+    eos: bool
+
+
+Response = SingleResponse | StreamResponse
+
+IncomingMessage = Annotated[
+    Union[SingleResponse, StreamResponse, Notification],
+    Field(discriminator="type"),
+]
+
+IncomingMessageValidator = TypeAdapter(IncomingMessage)
+
+
+class Command(ABC, BaseModel):
+    type: Literal[None] = None
+
+    def validate_response_value(self, value: Any) -> Any:
+        return value
+
+
+class Bundle(Command):
+    type: Literal[MessageType.BUNDLE] = Field(default=MessageType.BUNDLE, frozen=True)
     xid: int | None = None
-    value: JsonValue
+    ts: int = Field(default_factory=utc_ts)
+    mode: ResponseMode = ResponseMode.SINGLE
+    cmds: list[Any] = Field(default_factory=list)
+    rt: bool = False
+
+    model_config = ConfigDict(extra="forbid")
+
+    def model_dump(self, *args, **kwargs) -> dict[str, Any]:
+        kwargs["exclude_none"] = True
+        return super().model_dump(*args, **kwargs)
+
+    def validate_response_value(self, value: list[Any]) -> Any:
+        return [cmd.validate_response_value(value_i) for cmd, value_i in zip(self.cmds, value)]
 
 
-class CancelCommand(XRCommand):
-    cmd: Literal['cancel'] = Field(default='cancel', frozen=True)
+class Cancel(Command):
+    type: Literal["cancel"] = Field(default="cancel", frozen=True)
     target_xid: int
-    response_mode: ResponseMode = ResponseMode.NONE

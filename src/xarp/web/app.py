@@ -1,5 +1,5 @@
 import base64
-import json
+import msgpack as serializer
 import threading
 from functools import partial
 from queue import Queue
@@ -11,11 +11,12 @@ from streamlit.runtime.scriptrunner_utils.script_run_context import get_script_r
 from websockets import WebSocketException
 from websockets.sync.client import connect
 
-from xarp.data_models.chat import ChatMessage
-from xarp.data_models.spatial import Transform
-from xarp.storage.local_file_system import UserRepositoryLocalFileSystem
+from xarp.commands import Bundle
+from xarp.chat import ChatMessage
+from xarp.spatial import Transform
+from xarp.file_storage import FileUserRepository
+from xarp.settings import settings
 from xarp.web.chat_ui import render_chat_messages, require_session_obj
-from xarp import XRCommand, settings
 
 ws_key = 'ws'
 chat_key = 'chat'
@@ -53,10 +54,10 @@ def rerun_streamlit_thread():
 
 url = st.text_input('Websocket Server URL', value=r'ws://127.0.0.1:8000/ws')
 
-users = UserRepositoryLocalFileSystem(settings.local_storage)
+users = FileUserRepository(settings.local_storage)
 all_users = list(users.all())
 user = st.selectbox('User ID', all_users, format_func=lambda u: u.user_id)
-session = st.selectbox('Session', [None] + user.sessions,
+session = st.selectbox('Session', [None] + user.sessions if user is not None else [],
                        format_func=lambda s: str(s.ts) if s else 'New Session')
 
 top = st.container()
@@ -88,9 +89,9 @@ if top.toggle('connect'):
         def run_inbound():
             while ws_key in st.session_state:
                 try:
-                    cmd = ws.recv()
-                    cmd_json = json.loads(cmd)
-                    _xr_cmd = XRCommand.model_validate_json(cmd_json)
+                    cmd_bytes = ws.recv()
+                    cmd_data = serializer.loads(cmd_bytes)
+                    _xr_cmd = Bundle(**cmd_data)
                     inbound.append(_xr_cmd)
                     rerun_streamlit_thread()
                 except WebSocketException as e:
@@ -120,7 +121,7 @@ if top.toggle('connect'):
     for i, xr_cmd in enumerate(inbound):
         if i in executed:
             continue
-        match xr_cmd.cmd:
+        match xr_cmd.type:
             case 'write':
                 text = '\n'.join(map(str, xr_cmd.args))
                 msg = ChatMessage.from_assistant(text.strip())
@@ -180,8 +181,8 @@ if top.toggle('connect'):
                         }
                         response.append(img_dict)
 
-                    response_json = json.dumps(response)
-                    outbound.put_nowait(response_json)
+                    response_bytes = serializer.dumps(response)
+                    outbound.put_nowait(response_bytes)
                     bottom.empty()
                     executed.add(i)
             case _:

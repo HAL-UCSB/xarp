@@ -1,6 +1,6 @@
 from typing import Union
 
-from xarp.data_models.spatial import distance, cosine_similarity
+from .spatial import cosine_similarity, distance
 import numpy as np
 
 PALM = 0

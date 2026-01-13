@@ -4,8 +4,8 @@ from typing import List
 import pandas as pd
 import streamlit as st
 
-from xarp.data_models.binaries import ImageResource, BinaryResource
-from xarp.data_models.chat import ChatMessage
+from xarp.resources import ImageResource
+from xarp.chat import ChatMessage
 
 
 def require_session_obj(key, default):
