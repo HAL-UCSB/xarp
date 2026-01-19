@@ -5,12 +5,10 @@ from typing import Any, Iterator
 from typing import AsyncGenerator
 
 from xarp.commands import Bundle, ResponseMode
-from xarp.commands.assets import (
-    AssetCommand,
+from xarp.commands.entities import (
     ListAssetsCommand,
-    Element,
     DestroyElementCommand,
-    DestroyAssetCommand,
+    DestroyAssetCommand, ListElementsCommand, CreateOrUpdateAssetsCommand, CreateOrUpdateElementCommand,
 )
 from xarp.commands.info import InfoCommand
 from xarp.commands.sensing import (
@@ -23,8 +21,8 @@ from xarp.commands.sensing import (
 )
 from xarp.commands.ui import WriteCommand, SayCommand, ReadCommand, PassthroughCommand
 from xarp.data_models import DeviceInfo, Hands
+from xarp.entities import ImageAsset, Asset, Element
 from xarp.remote import RemoteXRClient
-from xarp.resources import ImageResource, BinaryResource
 from xarp.spatial import Pose
 
 
@@ -103,21 +101,21 @@ class AsyncXR:
 
     # ---- SENSING (SINGLE) ----
 
-    async def image(self) -> ImageResource:
+    async def image(self) -> ImageAsset:
         """Captures one RGB image of the physical environment.
         Returns:
             ImageResource containing an RGB image from the user's point of view.
         """
         return await self._execute_single(ImageCommand())
 
-    async def virtual_image(self) -> ImageResource:
+    async def virtual_image(self) -> ImageAsset:
         """Captures one RGBA image of the virtual environment.
         Returns:
             ImageResource containing an RGBA render from the user's point of view.
         """
         return await self._execute_single(VirtualImageCommand())
 
-    async def depth(self) -> ImageResource:
+    async def depth(self) -> ImageAsset:
         """Captures one depth frame of the physical environment.
         Returns:
             ImageResource containing a depth image from the user's point of view.
@@ -209,16 +207,14 @@ class AsyncXR:
 
     # ---- ASSETS ----
 
-    async def asset(self, asset_key: str, data: BinaryResource) -> None:
+    async def save(self, *assets: Asset) -> None:
         """Stores an asset on the XR device.
         Args:
-            asset_key: Identifier under which the asset is stored on the device.
-            data: Asset payload.
-
+            assets: asset objects to be stored on the device.
         Returns:
             None.
         """
-        await self._execute_single(AssetCommand(asset_key=asset_key, data=data))
+        await self._execute_single(CreateOrUpdateAssetsCommand(assets=assets))
 
     async def list_assets(self) -> list[str]:
         """Lists stored asset keys.
@@ -238,15 +234,22 @@ class AsyncXR:
         """
         await self._execute_single(DestroyAssetCommand(asset_key=asset_key, all_assets=all_assets))
 
-    async def update(self, element: Element) -> None:
-        """Creates or updates a remote element. Necessary to apply change the state of a remote element instance.
+    async def update(self, *elements: Element) -> None:
+        """Creates or updates (upsert) a remote element. Necessary to apply change the state of a remote element instance.
         Args:
-            element: An element command describing the desired remote element state.
+            elements: Elements defining the desired state of virtual elements on the client.
 
         Returns:
             None.
         """
-        await self._execute_single(element)
+        await self._execute_single(CreateOrUpdateElementCommand(elements=elements))
+
+    async def list_elements(self) -> list[str]:
+        """Lists existing elements, both active an inactive.
+        Returns:
+            List of element identification keys.
+        """
+        return await self._execute_single(ListElementsCommand())
 
     async def destroy_element(self, element: Element | None = None, all_elements: bool = False) -> None:
         """Destroys one element or all elements.
@@ -323,13 +326,13 @@ class SyncXR(AsyncXR):
         return self._sync(super().passthrough(transparency=transparency))
 
     # ---- SENSING (SINGLE) ----
-    def image(self) -> ImageResource:
+    def image(self) -> ImageAsset:
         return self._sync(super().image())
 
-    def virtual_image(self) -> ImageResource:
+    def virtual_image(self) -> ImageAsset:
         return self._sync(super().virtual_image())
 
-    def depth(self) -> ImageResource:
+    def depth(self) -> ImageAsset:
         return self._sync(super().depth())
 
     def eye(self) -> Pose:
@@ -364,9 +367,9 @@ class SyncXR(AsyncXR):
         )
         return _SyncSenseIter(agen, self._loop)
 
-    # ---- ASSETS ----
-    def asset(self, asset_key: str, data: BinaryResource) -> None:
-        return self._sync(super().asset(asset_key=asset_key, data=data))
+    # ---- ENTITIES ----
+    def save(self, *assets: Asset) -> None:
+        return self._sync(super().save(*assets))
 
     def list_assets(self) -> list[str]:
         return self._sync(super().list_assets())
@@ -374,8 +377,11 @@ class SyncXR(AsyncXR):
     def destroy_asset(self, asset_key: str | None = None, all_assets: bool = False) -> None:
         return self._sync(super().destroy_asset(asset_key=asset_key, all_assets=all_assets))
 
-    def update(self, element: Element) -> None:
-        return self._sync(super().update(element=element))
+    def update(self, *element: Element) -> None:
+        return self._sync(super().update(*element))
+
+    def list_elements(self) -> list[str]:
+        return self._sync(super().list_elements())
 
     def destroy_element(self, element: Element | None = None, all_elements: bool = False) -> None:
         return self._sync(super().destroy_element(element=element, all_elements=all_elements))

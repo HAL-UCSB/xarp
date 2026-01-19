@@ -38,18 +38,8 @@ class StreamResponse(SingleResponse):
     eos: bool
 
 
-Response = SingleResponse | StreamResponse
-
-IncomingMessage = Annotated[
-    Union[SingleResponse, StreamResponse, Notification],
-    Field(discriminator="type"),
-]
-
-IncomingMessageValidator = TypeAdapter(IncomingMessage)
-
-
 class Command(ABC, BaseModel):
-    type: Literal[None] = None
+    cmd: Literal[None] = None
 
     def validate_response_value(self, value: Any) -> Any:
         return value
@@ -63,8 +53,6 @@ class Bundle(Command):
     cmds: list[Any] = Field(default_factory=list)
     rt: bool = False
 
-    model_config = ConfigDict(extra="forbid")
-
     def model_dump(self, *args, **kwargs) -> dict[str, Any]:
         kwargs["exclude_none"] = True
         return super().model_dump(*args, **kwargs)
@@ -73,6 +61,19 @@ class Bundle(Command):
         return [cmd.validate_response_value(value_i) for cmd, value_i in zip(self.cmds, value)]
 
 
+IncomingMessage = Annotated[
+    Union[SingleResponse, StreamResponse, Notification],
+    Field(discriminator="type"),
+]
+
+IncomingMessageValidator = TypeAdapter(IncomingMessage)
+
+Response = Annotated[
+    Union[SingleResponse, StreamResponse],
+    Field(discriminator="type"),
+]
+
+
 class Cancel(Command):
-    type: Literal["cancel"] = Field(default="cancel", frozen=True)
+    cmd: Literal["cancel"] = Field(default="cancel", frozen=True)
     target_xid: int

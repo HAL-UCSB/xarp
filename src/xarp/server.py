@@ -53,18 +53,18 @@ def run(xr_app: XRApp) -> None:
     )
 
 
-def show_qrcode_link(protocol="ws", path=None, **query_params) -> PIL.Image.Image:
-    def _lan_ip() -> str:
+def show_qrcode_link(protocol="ws", address: str = None, path=None, **query_params) -> PIL.Image.Image:
+    if address is None:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.connect(("8.8.8.8", 80))
-            return s.getsockname()[0]
+            address = s.getsockname()[0]
 
     if path is None:
         path = settings.ws_path
     elif not path.startswith("/"):
         path = "/" + path
 
-    url = f"{protocol}://{_lan_ip()}:{settings.port}{path}"
+    url = f"{protocol}://{address}:{settings.port}{path}"
     if query_params:
         url += "?" + urlencode(query_params, doseq=True)
     print(url)

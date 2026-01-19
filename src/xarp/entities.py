@@ -1,55 +1,147 @@
-import uuid
-from abc import abstractmethod, ABC
-from typing import Optional, Generator
+import mimetypes
+from enum import Enum
+from io import BytesIO
+from typing import Literal, ClassVar, TypeVar, Generic, Self
 
-from pydantic import BaseModel, Field
+import trimesh
+from PIL import Image
+from pydantic import BaseModel, model_validator
+from pydantic import ConfigDict, PrivateAttr, model_serializer, Field
+from trimesh import Trimesh
 
-from xarp.time import utc_ts
-from xarp.chat import ChatMessage
+from xarp.spatial import Transform, Pose
 
-
-class Session(BaseModel):
-    user_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    ts: int = Field(default_factory=utc_ts)
-    chat: list[ChatMessage] = Field(default_factory=list)
-
-
-class User(BaseModel):
-    user_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    sessions: list[Session] = Field(default_factory=list)
+T = TypeVar("T")
 
 
-class SessionRepository(ABC):
+class MIMEType(str, Enum):
+    TXT = mimetypes.types_map[".txt"]
+    PNG = mimetypes.types_map[".png"]
+    JPEG = mimetypes.types_map[".jpg"]
+    MP3 = mimetypes.types_map[".mp3"]
+    WAV = mimetypes.types_map[".wav"]
+    OGG = "audio/ogg"
+    MP4 = mimetypes.types_map[".mp4"]
+    GLB = "model/gltf-binary"
 
-    def __init__(self, *args, **kwargs):
-        pass
-
-    @abstractmethod
-    def get(self, user_id: str, ts: int) -> Optional[Session]:
-        pass
-
-    @abstractmethod
-    def all(self, user_id: str = None) -> Generator[Session]:
-        pass
-
-    @abstractmethod
-    def save(self, session: Session) -> None:
-        pass
+    @staticmethod
+    def from_extension(ext: str) -> "MIMEType":
+        ext = ext if ext.startswith(".") else "." + ext
+        fallback = {
+            ".ogg": MIMEType.OGG.value,
+            ".glb": MIMEType.GLB.value,
+        }
+        mime = mimetypes.types_map.get(ext) or fallback.get(ext)
+        return MIMEType(mime)
 
 
-class UserRepository(ABC):
+class DefaultAssets(str, Enum):
+    SPHERE = "Sphere"
+    CUBE = "Cube"
 
-    def __init__(self, *args, **kwargs):
-        pass
 
-    @abstractmethod
-    def get(self, user_id: str) -> Optional[User]:
-        pass
+class Asset(BaseModel, Generic[T]):
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        extra="forbid",
+        strict=True,
+        use_enum_values=True
+    )
 
-    @abstractmethod
-    def all(self) -> Generator[User]:
-        pass
+    asset_key: str | None = None
+    mime_type: MIMEType | None = None
+    raw: bytes | None = None
 
-    @abstractmethod
-    def save(self, user: User) -> None:
-        pass
+    _obj: T | None = PrivateAttr(default=None)
+
+    @property
+    def obj(self) -> T:
+        if self._obj is None:
+            if self.raw is None:
+                raise RuntimeError("Either raw or obj must be provided")
+            self._obj = self._raw_to_obj(self.raw)
+        return self._obj
+
+    def _obj_to_raw(self, obj: T) -> bytes:
+        return obj
+
+    def _raw_to_obj(self, raw: bytes) -> T:
+        return raw
+
+    @model_serializer(mode="plain")
+    def serialize(self):
+        if self._obj is None and self.raw is None:
+            raise RuntimeError("Either raw or obj must be provided to an Asset before serializing it")
+        return dict(
+            asset_key=self.asset_key,
+            mime_type=self.mime_type,
+            raw=self.raw if self.raw is not None else self._obj_to_raw(self._obj)
+        )
+
+    @classmethod
+    def from_obj(cls, obj: T, mime_type: MIMEType = None, asset_key: str = None) -> Self:
+        self = cls(asset_key=asset_key, mime_type=mime_type)
+        self._obj = obj
+        return self
+
+
+class ImageAsset(Asset[Image.Image]):
+    mime_type: Literal[MIMEType.PNG, MIMEType.JPEG] = Field(default=MIMEType.PNG, frozen=True)
+
+    def _obj_to_raw(self, obj: Image.Image) -> bytes:
+        buf = BytesIO()
+        data_format = self.mime_type.split("/")[-1]
+        obj.save(buf, format=data_format)
+        return buf.getvalue()
+
+    def _raw_to_obj(self, raw: bytes) -> Image.Image:
+        buffer = BytesIO(raw)
+        return Image.open(buffer)
+
+
+class TextAsset(Asset[str]):
+    mime_type: Literal[MIMEType.TXT] = Field(default=MIMEType.TXT, frozen=True)
+
+    _encoding: ClassVar[Literal["utf-8"]] = "utf-8"
+
+    def _obj_to_raw(self, obj: str) -> bytes:
+        return str.encode(obj, self._encoding)
+
+    def _raw_to_obj(self, raw: bytes) -> str:
+        return raw.decode(self._encoding)
+
+    @classmethod
+    def from_obj(cls, obj: T, mime_type: MIMEType = MIMEType.TXT, asset_key: str = None) -> Self:
+        return super().from_obj(obj, mime_type, asset_key)
+
+
+class GLBAsset(Asset[Trimesh]):
+    mime_type: Literal[MIMEType.GLB] = Field(default=MIMEType.GLB, frozen=True)
+
+    _file_type: ClassVar[Literal["glb"]] = "glb"
+
+    def _obj_to_raw(self, obj: Trimesh) -> bytes:
+        return obj.export(file_type='glb')
+
+    def _raw_to_obj(self, raw: bytes) -> Trimesh:
+        buffer = BytesIO(raw)
+        return trimesh.load(buffer, file_type=self._file_type)
+
+
+class Element(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid"
+    )
+    key: str
+    active: bool = True
+    transform: Transform = Transform()
+    eye: Pose | None = None
+    distance: float | None = None
+    color: tuple[float, float, float, float] | None = None
+    asset: Asset | None = None
+
+    @model_validator(mode="after")
+    def validate_asset_key_data(self):
+        if self.eye is None and self.transform is None:
+            self.transform = Transform()
+        return self

@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     port: int = 8080
     ws_path: str = "/ws"
     local_storage: pathlib.PurePath = pathlib.PurePath(".") / "data"
-    heartbeat_timeout_secs: float = 10
+    heartbeat_timeout_secs: float = 5
 
 
 settings = Settings()
