@@ -1,7 +1,7 @@
 from typing import Any
 
-from xarp.commands.assets import Element, DefaultAssets
 from xarp.data_models import Hands
+from xarp.entities import Element, DefaultAssets
 from xarp.express import AsyncXR, SyncXR
 from xarp.gestures import pinch, INDEX_TIP
 from xarp.server import run, show_qrcode_link
@@ -15,7 +15,7 @@ blue = (0, 0, 1, 1)
 brush = Element(
     key="cursor",
     color=red,
-    asset_key=DefaultAssets.SPHERE,
+    asset=DefaultAssets.SPHERE,
     transform=Transform(
         scale=Vector3.one() * .02
     )
@@ -24,7 +24,7 @@ brush = Element(
 paint = Element(
     key="",
     color=green,
-    asset_key=DefaultAssets.SPHERE,
+    asset=DefaultAssets.SPHERE,
     transform=brush.transform
 )
 

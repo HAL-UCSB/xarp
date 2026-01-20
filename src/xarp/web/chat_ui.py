@@ -4,7 +4,7 @@ from typing import List
 import pandas as pd
 import streamlit as st
 
-from xarp.resources import ImageResource
+from xarp.resources import ImageAsset
 from xarp.chat import ChatMessage
 
 
@@ -37,7 +37,7 @@ def render_chat_message(i: int, message: ChatMessage):
     with st.chat_message(message.role):
         for content in message.content:
 
-            if isinstance(content, ImageResource):
+            if isinstance(content, ImageAsset):
                 with open(content.path.as_posix(), 'rb') as f:
                     st.image(f.read(), width='stretch')
                     continue

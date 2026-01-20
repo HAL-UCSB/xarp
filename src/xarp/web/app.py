@@ -121,7 +121,7 @@ if top.toggle('connect'):
     for i, xr_cmd in enumerate(inbound):
         if i in executed:
             continue
-        match xr_cmd.type:
+        match xr_cmd.cmd:
             case 'write':
                 text = '\n'.join(map(str, xr_cmd.args))
                 msg = ChatMessage.from_assistant(text.strip())

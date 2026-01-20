@@ -39,7 +39,7 @@ def run(xr_app: XRApp) -> None:
                     loop,
                     loop_thread)
                 await asyncio.to_thread(xr_app, xr, query_params)
-        print("grace")
+        print("normal session shutdown")
 
     app.add_api_websocket_route(
         settings.ws_path,
@@ -51,20 +51,21 @@ def run(xr_app: XRApp) -> None:
         port=settings.port,
         ws_max_size=100 * 1024 ** 2  # 100MB
     )
+    print("normal server shutdown")
 
 
-def show_qrcode_link(protocol="ws", path=None, **query_params) -> PIL.Image.Image:
-    def _lan_ip() -> str:
+def show_qrcode_link(protocol="ws", address: str = None, path=None, **query_params) -> PIL.Image.Image:
+    if address is None:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.connect(("8.8.8.8", 80))
-            return s.getsockname()[0]
+            address = s.getsockname()[0]
 
     if path is None:
         path = settings.ws_path
     elif not path.startswith("/"):
         path = "/" + path
 
-    url = f"{protocol}://{_lan_ip()}:{settings.port}{path}"
+    url = f"{protocol}://{address}:{settings.port}{path}"
     if query_params:
         url += "?" + urlencode(query_params, doseq=True)
     print(url)

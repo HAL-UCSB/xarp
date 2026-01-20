@@ -170,6 +170,46 @@ class Quaternion(RootModel[list[float]]):
             ])
         return Vector3([roll, pitch, yaw])
 
+    @classmethod
+    def from_euler_angles(
+            cls,
+            roll: float,
+            pitch: float,
+            yaw: float,
+            degrees: bool = True,
+    ) -> "Quaternion":
+        """
+        Create a quaternion from XYZ Euler angles (roll, pitch, yaw).
+
+        The rotation order is intrinsic X → Y → Z (roll, pitch, yaw),
+        consistent with `to_euler_angles`.
+
+        Angles are interpreted as degrees by default.
+        """
+        if degrees:
+            roll = math.radians(roll)
+            pitch = math.radians(pitch)
+            yaw = math.radians(yaw)
+
+        hr = roll * 0.5
+        hp = pitch * 0.5
+        hy = yaw * 0.5
+
+        cr = math.cos(hr)
+        sr = math.sin(hr)
+        cp = math.cos(hp)
+        sp = math.sin(hp)
+        cy = math.cos(hy)
+        sy = math.sin(hy)
+
+        # XYZ intrinsic rotation (roll → pitch → yaw)
+        x = sr * cp * cy - cr * sp * sy
+        y = cr * sp * cy + sr * cp * sy
+        z = cr * cp * sy - sr * sp * cy
+        w = cr * cp * cy + sr * sp * sy
+
+        return cls.from_xyzw(x, y, z, w).normalized()
+
     def to_matrix(self) -> np.ndarray:
         """
         Returns a 3x3 rotation matrix.
