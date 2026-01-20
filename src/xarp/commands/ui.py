@@ -13,7 +13,7 @@ class SayCommand(WriteCommand):
     cmd: Literal["say"] = Field(default="say", frozen=True)
 
 
-class ReadCommand(WriteCommand):
+class ReadCommand(Command):
     cmd: Literal["read"] = Field(default="read", frozen=True)
 
     def validate_response_value(self, value: dict) -> str:

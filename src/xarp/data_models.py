@@ -1,11 +1,9 @@
-import mimetypes
-from enum import Enum
 from typing import Tuple
 
 import numpy as np
 from pydantic import BaseModel, Field, ConfigDict
 
-from .spatial import Transform, Pose, Vector3, Quaternion
+from xarp.spatial import Pose, Vector3
 
 
 class Hands(BaseModel):

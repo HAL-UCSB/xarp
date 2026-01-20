@@ -1,47 +1,51 @@
 from typing import Any
 
-from xarp.commands.assets import Element
+from xarp.entities import Element
 from xarp.express import SyncXR, AsyncXR
 from xarp.server import run, show_qrcode_link
-from xarp.settings import settings
-from xarp.spatial import Pose
 
 panel = Element(
     key="panel",
-    eye=Pose(),
     distance=.49
 )
 
 
-def sync_app(xr: SyncXR, kwargs: dict[str, Any]) -> None:
-    xr.say("Video Feed")
-    senses = xr.sense(image=True, eye=True)
-    for frame in senses:
-        panel.binary = frame['image']
+def depth_panel(xr: SyncXR, kwargs):
+    stream = xr.sense(depth=True, eye=True)
+    for frame in stream:
+        panel.asset = frame['depth']
         panel.eye = frame['eye']
         xr.update(panel)
-    senses.close()
+    stream.close()
 
 
-async def async_app(axr: AsyncXR, kwargs: dict[str, Any]) -> None:
-    await axr.say("Video Feed")
-    senses = axr.sense(image=True, eye=True)
-    async for frame in senses:
-        panel.binary = frame['image']
+async def async_depth_panel(axr: AsyncXR, kwargs) -> None:
+    stream = axr.sense(depth=True, eye=True)
+    async for frame in stream:
+        panel.asset = frame['depth']
         panel.eye = frame['eye']
         await axr.update(panel)
-    senses.aclose()
+    await stream.aclose()
 
 
-async def async_app_depth(axr: AsyncXR, kwargs: dict[str, Any]) -> None:
-    await axr.say("Video Feed")
-    senses = axr.sense(depth=True, eye=True)
-    async for frame in senses:
-        panel.binary = frame['depth']
+def rgb_panel(xr: SyncXR, kwargs) -> None:
+    stream = xr.sense(image=True, eye=True)
+    for frame in stream:
+        panel.asset = frame['image']
+        panel.eye = frame['eye']
+        xr.update(panel)
+    stream.close()
+
+
+async def async_rgb_panel(axr: AsyncXR, kwargs: dict[str, Any]) -> None:
+    stream = axr.sense(image=True, eye=True)
+    async for frame in stream:
+        panel.asset = frame['image']
         panel.eye = frame['eye']
         await axr.update(panel)
-    senses.aclose()
+    await stream.aclose()
+
 
 if __name__ == '__main__':
-    show_qrcode_link(path=settings.ws_path)
-    run(async_app_depth)
+    show_qrcode_link()
+    run(async_rgb_panel)

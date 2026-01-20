@@ -39,7 +39,7 @@ def run(xr_app: XRApp) -> None:
                     loop,
                     loop_thread)
                 await asyncio.to_thread(xr_app, xr, query_params)
-        print("grace")
+        print("normal session shutdown")
 
     app.add_api_websocket_route(
         settings.ws_path,
@@ -51,6 +51,7 @@ def run(xr_app: XRApp) -> None:
         port=settings.port,
         ws_max_size=100 * 1024 ** 2  # 100MB
     )
+    print("normal server shutdown")
 
 
 def show_qrcode_link(protocol="ws", address: str = None, path=None, **query_params) -> PIL.Image.Image:

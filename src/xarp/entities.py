@@ -35,11 +35,6 @@ class MIMEType(str, Enum):
         return MIMEType(mime)
 
 
-class DefaultAssets(str, Enum):
-    SPHERE = "Sphere"
-    CUBE = "Cube"
-
-
 class Asset(BaseModel, Generic[T]):
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
@@ -49,7 +44,7 @@ class Asset(BaseModel, Generic[T]):
     )
 
     asset_key: str | None = None
-    mime_type: MIMEType | None = None
+    mime_type: MIMEType = None
     raw: bytes | None = None
 
     _obj: T | None = PrivateAttr(default=None)
@@ -80,9 +75,21 @@ class Asset(BaseModel, Generic[T]):
 
     @classmethod
     def from_obj(cls, obj: T, mime_type: MIMEType = None, asset_key: str = None) -> Self:
-        self = cls(asset_key=asset_key, mime_type=mime_type)
+        if mime_type is None:
+            self = cls(asset_key=asset_key)
+        else:
+            self = cls(asset_key=asset_key, mime_type=mime_type)
         self._obj = obj
         return self
+
+
+class DefaultAssets:
+    SPHERE = Asset(asset_key="Sphere", raw=b"")
+    CUBE = Asset(asset_key="Cube", raw=b"")
+    CAPSULE = Asset(asset_key="Capsule", raw=b"")
+    CYLINDER = Asset(asset_key="Cylinder", raw=b"")
+    PLANE = Asset(asset_key="Plane", raw=b"")
+    QUAD = Asset(asset_key="Quad", raw=b"")
 
 
 class ImageAsset(Asset[Image.Image]):

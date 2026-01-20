@@ -1,8 +1,14 @@
 import asyncio
+import base64
 import threading
+import types
+from io import BytesIO
 from threading import Thread
 from typing import Any, Iterator
 from typing import AsyncGenerator
+
+import PIL.Image
+from fastapi import requests
 
 from xarp.commands import Bundle, ResponseMode
 from xarp.commands.entities import (
@@ -21,9 +27,9 @@ from xarp.commands.sensing import (
 )
 from xarp.commands.ui import WriteCommand, SayCommand, ReadCommand, PassthroughCommand
 from xarp.data_models import DeviceInfo, Hands
-from xarp.entities import ImageAsset, Asset, Element
+from xarp.entities import ImageAsset, Asset, Element, GLBAsset, TextAsset, DefaultAssets
 from xarp.remote import RemoteXRClient
-from xarp.spatial import Pose
+from xarp.spatial import Pose, Transform, Vector3, Quaternion
 
 
 class AsyncXR:
@@ -77,17 +83,12 @@ class AsyncXR:
             Bundle(cmds=[SayCommand(text=text, title=title)], mode=ResponseMode.SINGLE)
         )
 
-    async def read(self, text: str, title: str | None = None) -> str:
+    async def read(self) -> str:
         """Prompts the user for text input and returns it.
-
-        Args:
-            text: Prompt content presented to the user.
-            title: Optional title displayed alongside the prompt.
-
         Returns:
             The user's entered text.
         """
-        return await self._execute_single(ReadCommand(text=text, title=title))
+        return await self._execute_single(ReadCommand())
 
     async def passthrough(self, transparency: float) -> None:
         """Sets passthrough transparency.
@@ -207,14 +208,14 @@ class AsyncXR:
 
     # ---- ASSETS ----
 
-    async def save(self, *assets: Asset) -> None:
+    async def save(self, asset: Asset) -> None:
         """Stores an asset on the XR device.
         Args:
-            assets: asset objects to be stored on the device.
+            asset: asset object to be stored on the device.
         Returns:
             None.
         """
-        await self._execute_single(CreateOrUpdateAssetsCommand(assets=assets))
+        await self._execute_single(CreateOrUpdateAssetsCommand(assets=[asset]))
 
     async def list_assets(self) -> list[str]:
         """Lists stored asset keys.
@@ -234,15 +235,15 @@ class AsyncXR:
         """
         await self._execute_single(DestroyAssetCommand(asset_key=asset_key, all_assets=all_assets))
 
-    async def update(self, *elements: Element) -> None:
-        """Creates or updates (upsert) a remote element. Necessary to apply change the state of a remote element instance.
+    async def update(self, element: Element) -> None:
+        """
+        Creates or updates (upsert) a remote element. Necessary to apply change the state of a remote element instance.
         Args:
-            elements: Elements defining the desired state of virtual elements on the client.
-
+            element: Element holding the desired state of virtual elements on the client.
         Returns:
             None.
         """
-        await self._execute_single(CreateOrUpdateElementCommand(elements=elements))
+        await self._execute_single(CreateOrUpdateElementCommand(elements=[element]))
 
     async def list_elements(self) -> list[str]:
         """Lists existing elements, both active an inactive.
@@ -254,7 +255,7 @@ class AsyncXR:
     async def destroy_element(self, element: Element | None = None, all_elements: bool = False) -> None:
         """Destroys one element or all elements.
         Args:
-            element: Element to destroy. If provided, its ``key`` is used.
+            element: Element to destroy.
             all_elements: If True, destroys all elements.
 
         Returns:
@@ -268,7 +269,7 @@ class AsyncXR:
         )
 
 
-class _SyncSenseIter(Iterator[dict[str, Any]]):
+class AsyncGeneratorIterator(Iterator[dict[str, Any]]):
     """Blocking iterator over an async generator, running on a given loop."""
 
     def __init__(self, agen, loop: asyncio.AbstractEventLoop):
@@ -276,7 +277,7 @@ class _SyncSenseIter(Iterator[dict[str, Any]]):
         self._loop = loop
         self._done = False
 
-    def __iter__(self) -> "_SyncSenseIter":
+    def __iter__(self) -> "AsyncGeneratorIterator":
         return self
 
     def __next__(self) -> dict[str, Any]:
@@ -303,7 +304,7 @@ class SyncXR(AsyncXR):
         self._loop = loop
         self._loop_thread = loop_thread
 
-    def _sync(self, coro):
+    def _sync(self, coro) -> Any:
         if threading.current_thread() is self._loop_thread:
             raise RuntimeError("SyncXR called from its event loop thread leads to deadlock")
         return asyncio.run_coroutine_threadsafe(coro, self._loop).result()
@@ -319,8 +320,8 @@ class SyncXR(AsyncXR):
     def say(self, text: str, title: str | None = None) -> None:
         return self._sync(super().say(text=text, title=title))
 
-    def read(self, text: str, title: str | None = None) -> str:
-        return self._sync(super().read(text=text, title=title))
+    def read(self) -> str:
+        return self._sync(super().read())
 
     def passthrough(self, transparency: float) -> None:
         return self._sync(super().passthrough(transparency=transparency))
@@ -355,7 +356,7 @@ class SyncXR(AsyncXR):
             head: bool = False,
             hands: bool = False,
             rt: bool = True,
-    ) -> _SyncSenseIter:
+    ) -> AsyncGeneratorIterator:
         agen = super().sense(
             image=image,
             virtual_image=virtual_image,
@@ -365,11 +366,11 @@ class SyncXR(AsyncXR):
             hands=hands,
             rt=rt,
         )
-        return _SyncSenseIter(agen, self._loop)
+        return AsyncGeneratorIterator(agen, self._loop)
 
     # ---- ENTITIES ----
-    def save(self, *assets: Asset) -> None:
-        return self._sync(super().save(*assets))
+    def save(self, asset: Asset) -> None:
+        return self._sync(super().save(asset))
 
     def list_assets(self) -> list[str]:
         return self._sync(super().list_assets())
@@ -377,8 +378,8 @@ class SyncXR(AsyncXR):
     def destroy_asset(self, asset_key: str | None = None, all_assets: bool = False) -> None:
         return self._sync(super().destroy_asset(asset_key=asset_key, all_assets=all_assets))
 
-    def update(self, *element: Element) -> None:
-        return self._sync(super().update(*element))
+    def update(self, element: Element) -> None:
+        return self._sync(super().update(element))
 
     def list_elements(self) -> list[str]:
         return self._sync(super().list_elements())
@@ -387,9 +388,393 @@ class SyncXR(AsyncXR):
         return self._sync(super().destroy_element(element=element, all_elements=all_elements))
 
 
-for _name, _member in list(SyncXR.__dict__.items()):
-    if _name.startswith("_"):
-        continue
-    _src = getattr(AsyncXR, _name, None)
-    if _src is not None and getattr(_src, "__doc__", None):
-        getattr(SyncXR, _name).__doc__ = _src.__doc__
+class AsyncSimpleXR(AsyncXR):
+
+    async def info(self) -> dict[str, Any]:
+        return await super().info().model_dump()
+
+    async def eye(self) -> dict[str, Any]:
+        return await super().eye().model_dump()
+
+    async def head(self) -> dict[str, Any]:
+        return await super().head().model_dump()
+
+    async def hands(self) -> dict[str, Any]:
+        return await super().hands().model_dump()
+
+    async def create_or_update_glb(self, key: str, url: str,
+                                   position: tuple[float, float, float] = (0, 0, 0),
+                                   euler_angles: tuple[float, float, float] = (0, 0, 0),
+                                   scale: tuple[float, float, float] = (1, 1, 1),
+                                   color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
+        """Create or update a GLB-based element in the scene.
+
+        If an element with the given key already exists, it is replaced.
+        Otherwise, a new element is created and added.
+
+        Args:
+            key: Unique identifier for the element.
+            url: URL to download the GLB asset.
+            position: World-space position (x, y, z).
+            euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
+                in radians.
+            scale: Non-uniform scale factors (x, y, z).
+            color: RGBA color multiplier with components in [0.0, 1.0].
+
+        Returns:
+            None
+        """
+        response = requests.get(
+            url,
+            headers={"User-Agent": "python"},
+            timeout=10
+        )
+        response.raise_for_status()
+        glb_bytes = response.content
+
+        element = Element(
+            key=key,
+            asset=GLBAsset(asset_key=f"asset_{key}", url=url),
+            color=color,
+            transform=Transform(
+                position=Vector3.from_xyz(*position),
+                rotation=Quaternion.from_euler_angles(*euler_angles),
+                scale=Vector3.from_xyz(*scale),
+            )
+        )
+        await self.update(element)
+
+    async def create_or_update_label(self, key: str, text: str,
+                                     position: tuple[float, float, float] = (0, 0, 0),
+                                     euler_angles: tuple[float, float, float] = (0, 0, 0),
+                                     scale: tuple[float, float, float] = (1, 1, 1),
+                                     color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
+        """Create or update a text label element in the scene.
+
+        The label is rendered as a text-based asset positioned in 3D space.
+
+        Args:
+            key: Unique identifier for the element.
+            text: Text content of the label.
+            position: World-space position (x, y, z).
+            euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
+                in radians.
+            scale: Non-uniform scale factors (x, y, z).
+            color: RGBA color multiplier with components in [0.0, 1.0].
+
+        Returns:
+            None
+        """
+        element = Element(
+            key=key,
+            asset=TextAsset.from_obj(text),
+            color=color,
+            transform=Transform(
+                position=Vector3.from_xyz(*position),
+                rotation=Quaternion.from_euler_angles(*euler_angles),
+                scale=Vector3.from_xyz(*scale),
+            )
+        )
+        self.update(element)
+
+    async def create_or_update_cube(self, key: str,
+                                    position: tuple[float, float, float] = (0, 0, 0),
+                                    euler_angles: tuple[float, float, float] = (0, 0, 0),
+                                    scale: tuple[float, float, float] = (1, 1, 1),
+                                    color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
+        """Create or update a cube primitive element in the scene.
+
+        Uses the default cube asset.
+
+        Args:
+            key: Unique identifier for the element.
+            position: World-space position (x, y, z).
+            euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
+                in radians.
+            scale: Non-uniform scale factors (x, y, z).
+            color: RGBA color multiplier with components in [0.0, 1.0].
+
+        Returns:
+            None
+        """
+        element = Element(
+            key=key,
+            asset=DefaultAssets.CUBE,
+            color=color,
+            transform=Transform(
+                position=Vector3.from_xyz(*position),
+                rotation=Quaternion.from_euler_angles(*euler_angles),
+                scale=Vector3.from_xyz(*scale),
+            )
+        )
+        await self.update(element)
+
+    async def create_or_update_sphere(self, key: str,
+                                      position: tuple[float, float, float] = (0, 0, 0),
+                                      euler_angles: tuple[float, float, float] = (0, 0, 0),
+                                      scale: tuple[float, float, float] = (1, 1, 1),
+                                      color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
+        """Create or update a sphere primitive element in the scene.
+
+        Uses the default sphere asset.
+
+        Args:
+            key: Unique identifier for the element.
+            position: World-space position (x, y, z).
+            euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
+                in radians.
+            scale: Non-uniform scale factors (x, y, z).
+            color: RGBA color multiplier with components in [0.0, 1.0].
+
+        Returns:
+            None
+        """
+        element = Element(
+            key=key,
+            asset=DefaultAssets.SPHERE,
+            color=color,
+            transform=Transform(
+                position=Vector3.from_xyz(*position),
+                rotation=Quaternion.from_euler_angles(*euler_angles),
+                scale=Vector3.from_xyz(*scale),
+            )
+        )
+        await self.update(element)
+
+    async def create_or_update_image(self, key: str,
+                                     base_64: str,
+                                     position: tuple[float, float, float] = (0, 0, 0),
+                                     euler_angles: tuple[float, float, float] = (0, 0, 0),
+                                     scale: tuple[float, float, float] = (1, 1, 1),
+                                     color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
+        """Create or update an image-based element in the scene.
+
+        The image is decoded from a base64-encoded string and converted to
+        an RGBA texture.
+
+        Args:
+            key: Unique identifier for the element.
+            base_64: Base64-encoded image data.
+            position: World-space position (x, y, z).
+            euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
+                in radians.
+            scale: Non-uniform scale factors (x, y, z).
+            color: RGBA color multiplier with components in [0.0, 1.0].
+
+        Returns:
+            None
+        """
+        decoded = base64.b64decode(base_64)
+        buffer = BytesIO(decoded)
+        img = PIL.Image.open(buffer).convert("RGBA")
+        element = Element(
+            key=key,
+            asset=ImageAsset.from_obj(img),
+            color=color,
+            transform=Transform(
+                position=Vector3.from_xyz(*position),
+                rotation=Quaternion.from_euler_angles(*euler_angles),
+                scale=Vector3.from_xyz(*scale),
+            )
+        )
+        await self.update(element)
+
+
+class SyncSimpleXR(SyncXR):
+
+    def info(self) -> dict[str, Any]:
+        return super().info().model_dump()
+
+    def eye(self) -> dict[str, Any]:
+        return super().eye().model_dump()
+
+    def head(self) -> dict[str, Any]:
+        return super().head().model_dump()
+
+    def hands(self) -> dict[str, Any]:
+        return super().hands().model_dump()
+
+    def create_or_update_glb(self, key: str, raw: bytes,
+                             position: tuple[float, float, float] = (0, 0, 0),
+                             euler_angles: tuple[float, float, float] = (0, 0, 0),
+                             scale: tuple[float, float, float] = (1, 1, 1),
+                             color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
+        """Create or update a GLB-based element in the scene.
+
+        If an element with the given key already exists, it is replaced.
+        Otherwise, a new element is created and added.
+
+        Args:
+            key: Unique identifier for the element.
+            raw: Raw bytes of the GLB asset.
+            position: World-space position (x, y, z).
+            euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
+                in radians.
+            scale: Non-uniform scale factors (x, y, z).
+            color: RGBA color multiplier with components in [0.0, 1.0].
+
+        Returns:
+            None
+        """
+        element = Element(
+            key=key,
+            asset=GLBAsset(asset_key=f"asset_{key}", raw=raw),
+            color=color,
+            transform=Transform(
+                position=Vector3.from_xyz(*position),
+                rotation=Quaternion.from_euler_angles(*euler_angles),
+                scale=Vector3.from_xyz(*scale),
+            )
+        )
+        self.update(element)
+
+    def create_or_update_label(self, key: str, text: str,
+                               position: tuple[float, float, float] = (0, 0, 0),
+                               euler_angles: tuple[float, float, float] = (0, 0, 0),
+                               scale: tuple[float, float, float] = (1, 1, 1),
+                               color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
+        """Create or update a text label element in the scene.
+
+        The label is rendered as a text-based asset positioned in 3D space.
+
+        Args:
+            key: Unique identifier for the element.
+            text: Text content of the label.
+            position: World-space position (x, y, z).
+            euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
+                in radians.
+            scale: Non-uniform scale factors (x, y, z).
+            color: RGBA color multiplier with components in [0.0, 1.0].
+
+        Returns:
+            None
+        """
+        element = Element(
+            key=key,
+            asset=TextAsset.from_obj(text),
+            color=color,
+            transform=Transform(
+                position=Vector3.from_xyz(*position),
+                rotation=Quaternion.from_euler_angles(*euler_angles),
+                scale=Vector3.from_xyz(*scale),
+            )
+        )
+        self.update(element)
+
+    def create_or_update_cube(self, key: str,
+                              position: tuple[float, float, float] = (0, 0, 0),
+                              euler_angles: tuple[float, float, float] = (0, 0, 0),
+                              scale: tuple[float, float, float] = (1, 1, 1),
+                              color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
+        """Create or update a cube primitive element in the scene.
+
+        Uses the default cube asset.
+
+        Args:
+            key: Unique identifier for the element.
+            position: World-space position (x, y, z).
+            euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
+                in radians.
+            scale: Non-uniform scale factors (x, y, z).
+            color: RGBA color multiplier with components in [0.0, 1.0].
+
+        Returns:
+            None
+        """
+        element = Element(
+            key=key,
+            asset=DefaultAssets.CUBE,
+            color=color,
+            transform=Transform(
+                position=Vector3.from_xyz(*position),
+                rotation=Quaternion.from_euler_angles(*euler_angles),
+                scale=Vector3.from_xyz(*scale),
+            )
+        )
+        self.update(element)
+
+    def create_or_update_sphere(self, key: str,
+                                position: tuple[float, float, float] = (0, 0, 0),
+                                euler_angles: tuple[float, float, float] = (0, 0, 0),
+                                scale: tuple[float, float, float] = (1, 1, 1),
+                                color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
+        """Create or update a sphere primitive element in the scene.
+
+        Uses the default sphere asset.
+
+        Args:
+            key: Unique identifier for the element.
+            position: World-space position (x, y, z).
+            euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
+                in radians.
+            scale: Non-uniform scale factors (x, y, z).
+            color: RGBA color multiplier with components in [0.0, 1.0].
+
+        Returns:
+            None
+        """
+        element = Element(
+            key=key,
+            asset=DefaultAssets.SPHERE,
+            color=color,
+            transform=Transform(
+                position=Vector3.from_xyz(*position),
+                rotation=Quaternion.from_euler_angles(*euler_angles),
+                scale=Vector3.from_xyz(*scale),
+            )
+        )
+        self.update(element)
+
+    def create_or_update_image(self, key: str,
+                               base_64: str,
+                               position: tuple[float, float, float] = (0, 0, 0),
+                               euler_angles: tuple[float, float, float] = (0, 0, 0),
+                               scale: tuple[float, float, float] = (1, 1, 1),
+                               color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
+        """Create or update an image-based element in the scene.
+
+        The image is decoded from a base64-encoded string and converted to
+        an RGBA texture.
+
+        Args:
+            key: Unique identifier for the element.
+            base_64: Base64-encoded image data.
+            position: World-space position (x, y, z).
+            euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
+                in radians.
+            scale: Non-uniform scale factors (x, y, z).
+            color: RGBA color multiplier with components in [0.0, 1.0].
+
+        Returns:
+            None
+        """
+        decoded = base64.b64decode(base_64)
+        buffer = BytesIO(decoded)
+        img = PIL.Image.open(buffer).convert("RGBA")
+        element = Element(
+            key=key,
+            asset=ImageAsset.from_obj(img),
+            color=color,
+            transform=Transform(
+                position=Vector3.from_xyz(*position),
+                rotation=Quaternion.from_euler_angles(*euler_angles),
+                scale=Vector3.from_xyz(*scale),
+            )
+        )
+        self.update(element)
+
+
+def copy_public_methods_doc(from_class, to_class):
+    for name, member in to_class.__dict__.items():
+        if name.startswith("_"):
+            continue
+        if not isinstance(member, types.FunctionType):
+            continue
+        src = getattr(from_class, name, None)
+        src_doc = getattr(src, "__doc__", None)
+        if not src_doc:
+            continue
+        member.__doc__ = src_doc
+
+
+copy_public_methods_doc(AsyncXR, SyncXR)
