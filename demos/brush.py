@@ -22,7 +22,7 @@ brush = Element(
 )
 
 paint = Element(
-    key="",
+    key="paint_",
     color=green,
     asset=DefaultAssets.SPHERE,
     transform=brush.transform
@@ -31,6 +31,8 @@ paint = Element(
 
 def sync_app(xr: SyncXR, kwargs: dict[str, Any]) -> None:
     xr.say("Brush XR")
+
+    xr.update(paint)
 
     i = 0
     senses = xr.sense(hands=True)
