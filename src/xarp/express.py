@@ -8,7 +8,7 @@ from typing import Any, Iterator
 from typing import AsyncGenerator
 
 import PIL.Image
-from fastapi import requests
+import requests
 
 from xarp.commands import Bundle, ResponseMode
 from xarp.commands.entities import (
@@ -434,7 +434,7 @@ class AsyncSimpleXR(AsyncXR):
 
         element = Element(
             key=key,
-            asset=GLBAsset(asset_key=f"asset_{key}", url=url),
+            asset=GLBAsset(asset_key=f"asset_{key}", raw=glb_bytes),
             color=color,
             transform=Transform(
                 position=Vector3.from_xyz(*position),
