@@ -7,7 +7,7 @@ from xarp.server import show_qrcode_link
 model = OpenAIServerModel(
     model_id="gpt-5-mini",
     api_key="lm-studio",
-    api_base="http://IP:PORT/v1"
+    api_base="http://169.254.167.39:1234/v1"
 )
 
 custom_system_prompt = """

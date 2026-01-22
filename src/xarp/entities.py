@@ -41,7 +41,8 @@ class Asset(BaseModel, Generic[T]):
         arbitrary_types_allowed=True,
         extra="forbid",
         strict=True,
-        use_enum_values=True
+        use_enum_values=True,
+        validate_assignment=True
     )
 
     asset_key: str | None = None
@@ -138,8 +139,10 @@ class GLBAsset(Asset[Trimesh]):
 
 class Element(BaseModel):
     model_config = ConfigDict(
-        extra="forbid"
+        extra="forbid",
+        validate_assignment=True
     )
+
     key: str
     active: bool = True
     transform: Transform = Transform()

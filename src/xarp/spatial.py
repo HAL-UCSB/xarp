@@ -1,12 +1,15 @@
 import math
-from typing import Optional
+from typing import Optional, Self
 
 import numpy as np
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from pydantic import RootModel
 
 
 class Vector3(RootModel[list[float]]):
+    model_config = ConfigDict(
+        validate_assignment=True
+    )
 
     @property
     def x(self) -> float:
@@ -33,16 +36,28 @@ class Vector3(RootModel[list[float]]):
         self.root[2] = float(value)
 
     @classmethod
-    def from_xyz(cls, x: float, y: float, z: float) -> "Vector3":
+    def from_xyz(cls, x: float, y: float, z: float) -> Self:
         return cls([float(x), float(y), float(z)])
 
     @staticmethod
-    def zero() -> "Vector3":
+    def zero() -> Self:
         return Vector3([0.0, 0.0, 0.0])
 
     @staticmethod
-    def one() -> "Vector3":
+    def one() -> Self:
         return Vector3([1.0, 1.0, 1.0])
+
+    @staticmethod
+    def forward() -> Self:
+        return Vector3([0, 0, 1.0])
+
+    @staticmethod
+    def up() -> Self:
+        return Vector3([0, 1.0, 0])
+
+    @staticmethod
+    def right() -> Self:
+        return Vector3([1.0, 0, 0])
 
     def to_numpy(self) -> np.ndarray:
         return np.array(self.root, dtype=float)
@@ -50,14 +65,14 @@ class Vector3(RootModel[list[float]]):
     def norm(self) -> float:
         return float(np.linalg.norm(self.root))
 
-    def normalized(self) -> "Vector3":
+    def normalized(self) -> Self:
         arr = self.to_numpy()
         n = np.linalg.norm(arr)
         if n == 0.0:
             raise ValueError("Cannot normalize zero vector")
         return Vector3((arr / n).tolist())
 
-    def __add__(self, other: "Vector3") -> "Vector3":
+    def __add__(self, other: Self) -> Self:
         if not isinstance(other, Vector3):
             return NotImplemented
         return Vector3([
@@ -66,7 +81,7 @@ class Vector3(RootModel[list[float]]):
             self.root[2] + other.root[2],
         ])
 
-    def __sub__(self, other: "Vector3") -> "Vector3":
+    def __sub__(self, other: Self) -> Self:
         if not isinstance(other, Vector3):
             return NotImplemented
         return Vector3([
@@ -75,13 +90,13 @@ class Vector3(RootModel[list[float]]):
             self.root[2] - other.root[2],
         ])
 
-    def __radd__(self, other: "Vector3") -> "Vector3":
+    def __radd__(self, other: Self) -> Self:
         return self.__add__(other)
 
-    def __rsub__(self, other: "Vector3") -> "Vector3":
+    def __rsub__(self, other: Self) -> Self:
         return self.__sub__(other)
 
-    def __mul__(self, scalar: float) -> "Vector3":
+    def __mul__(self, scalar: float) -> Self:
         if not isinstance(scalar, (int, float)):
             return NotImplemented
         return Vector3([
@@ -90,14 +105,17 @@ class Vector3(RootModel[list[float]]):
             self.root[2] * scalar,
         ])
 
-    def __rmul__(self, scalar: float) -> "Vector3":
+    def __rmul__(self, scalar: float) -> Self:
         return self.__mul__(scalar)
 
 
 class Quaternion(RootModel[list[float]]):
+    model_config = ConfigDict(
+        validate_assignment=True
+    )
 
     @classmethod
-    def from_xyzw(cls, x: float, y: float, z: float, w: float) -> "Quaternion":
+    def from_xyzw(cls, x: float, y: float, z: float, w: float) -> Self:
         return cls([float(x), float(y), float(z), float(w)])
 
     @property
@@ -123,7 +141,7 @@ class Quaternion(RootModel[list[float]]):
     def norm(self) -> float:
         return float(np.linalg.norm(self.root))
 
-    def normalized(self) -> "Quaternion":
+    def normalized(self) -> Self:
         arr = self.to_numpy()
         n = np.linalg.norm(arr)
         if n == 0.0:
@@ -131,11 +149,11 @@ class Quaternion(RootModel[list[float]]):
         return Quaternion((arr / n).tolist())
 
     @staticmethod
-    def zero() -> "Quaternion":
+    def zero() -> Self:
         return Quaternion([0.0, 0.0, 0.0, 0.0])
 
     @staticmethod
-    def identity() -> "Quaternion":
+    def identity() -> Self:
         return Quaternion([0.0, 0.0, 0.0, 1.0])
 
     def to_euler_angles(self, degrees=True) -> Vector3:
@@ -177,7 +195,7 @@ class Quaternion(RootModel[list[float]]):
             pitch: float,
             yaw: float,
             degrees: bool = True,
-    ) -> "Quaternion":
+    ) -> Self:
         """
         Create a quaternion from XYZ Euler angles (roll, pitch, yaw).
 
@@ -234,7 +252,47 @@ class Quaternion(RootModel[list[float]]):
             [2.0 * (xz - wy), 2.0 * (yz + wx), 1.0 - 2.0 * (xx + yy)],
         ], dtype=float)
 
-    def inverse(self) -> "Quaternion":
+    @classmethod
+    def from_matrix(cls, m: np.ndarray) -> Self:
+        """
+        Create a quaternion from a 3x3 right-handed rotation matrix.
+
+        Expects m to be a proper rotation matrix (orthonormal, det ~ +1).
+        """
+        m = np.asarray(m, dtype=float)
+        if m.shape != (3, 3):
+            raise ValueError("Rotation matrix must be 3x3")
+
+        trace = float(m[0, 0] + m[1, 1] + m[2, 2])
+
+        if trace > 0.0:
+            s = math.sqrt(trace + 1.0) * 2.0
+            w = 0.25 * s
+            x = (m[2, 1] - m[1, 2]) / s
+            y = (m[0, 2] - m[2, 0]) / s
+            z = (m[1, 0] - m[0, 1]) / s
+        elif m[0, 0] > m[1, 1] and m[0, 0] > m[2, 2]:
+            s = math.sqrt(1.0 + m[0, 0] - m[1, 1] - m[2, 2]) * 2.0
+            w = (m[2, 1] - m[1, 2]) / s
+            x = 0.25 * s
+            y = (m[0, 1] + m[1, 0]) / s
+            z = (m[0, 2] + m[2, 0]) / s
+        elif m[1, 1] > m[2, 2]:
+            s = math.sqrt(1.0 + m[1, 1] - m[0, 0] - m[2, 2]) * 2.0
+            w = (m[0, 2] - m[2, 0]) / s
+            x = (m[0, 1] + m[1, 0]) / s
+            y = 0.25 * s
+            z = (m[1, 2] + m[2, 1]) / s
+        else:
+            s = math.sqrt(1.0 + m[2, 2] - m[0, 0] - m[1, 1]) * 2.0
+            w = (m[1, 0] - m[0, 1]) / s
+            x = (m[0, 2] + m[2, 0]) / s
+            y = (m[1, 2] + m[2, 1]) / s
+            z = 0.25 * s
+
+        return cls.from_xyzw(x, y, z, w).normalized()
+
+    def inverse(self) -> Self:
         """
         Returns the inverse of the quaternion.
         For unit quaternions, this is just the conjugate.
@@ -250,8 +308,41 @@ class Quaternion(RootModel[list[float]]):
             w / n2,
         ])
 
+    @classmethod
+    def from_up_forward(cls, up: Vector3, forward: Vector3 = None) -> Self:
+        """
+        Create a quaternion from desired up (+Y) and forward (+Z) directions.
+
+        Right-handed frame:
+            right = up × forward
+        Columns of rotation matrix are [right, up, forward].
+        Default forward is +Z
+        """
+        if forward is None:
+            forward = Vector3.forward()
+
+        u = up.normalized().to_numpy()
+        f = forward.normalized().to_numpy()
+
+        r = np.cross(u, f)
+        rn = float(np.linalg.norm(r))
+        if rn == 0.0:
+            raise ValueError("up and forward vectors must not be collinear")
+        r /= rn
+
+        # re-orthogonalize forward to eliminate drift
+        f = np.cross(r, u)
+
+        m = np.column_stack((r, u, f))  # columns: right, up, forward
+        return cls.from_matrix(m)
+
 
 class Pose(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True
+    )
+
     position: Vector3 = Field(default_factory=Vector3.zero)
     rotation: Quaternion = Field(default_factory=Quaternion.identity)
 
