@@ -7,6 +7,10 @@ from xarp.spatial import Pose, Vector3
 
 
 class Hands(BaseModel):
+    model_config = ConfigDict(
+        frozen=True,
+        extra="forbid",
+    )
     left: Tuple[Pose, ...] = Field(default_factory=tuple)
     right: Tuple[Pose, ...] = Field(default_factory=tuple)
 
@@ -23,7 +27,11 @@ class Hands(BaseModel):
 
 
 class CameraIntrinsics(BaseModel):
-    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
+    model_config = ConfigDict(
+        frozen=True,
+        extra="forbid",
+        arbitrary_types_allowed=True
+    )
 
     focal_length: Tuple[float, float]
     principal_point: Tuple[float, float]
@@ -119,4 +127,9 @@ class CameraIntrinsics(BaseModel):
 
 
 class DeviceInfo(BaseModel):
+    model_config = ConfigDict(
+        frozen=True,
+        extra="forbid",
+    )
+
     camera_intrinsics: CameraIntrinsics

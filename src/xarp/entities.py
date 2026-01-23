@@ -23,6 +23,7 @@ class MIMEType(str, Enum):
     OGG = "audio/ogg"
     MP4 = mimetypes.types_map[".mp4"]
     GLB = "model/gltf-binary"
+    XARP_DEFAULT = "application/vnd.xarp.default"
 
     @staticmethod
     def from_extension(ext: str) -> "MIMEType":
@@ -40,7 +41,8 @@ class Asset(BaseModel, Generic[T]):
         arbitrary_types_allowed=True,
         extra="forbid",
         strict=True,
-        use_enum_values=True
+        use_enum_values=True,
+        validate_assignment=True
     )
 
     asset_key: str | None = None
@@ -84,12 +86,12 @@ class Asset(BaseModel, Generic[T]):
 
 
 class DefaultAssets:
-    SPHERE = Asset(asset_key="Sphere", raw=b"")
-    CUBE = Asset(asset_key="Cube", raw=b"")
-    CAPSULE = Asset(asset_key="Capsule", raw=b"")
-    CYLINDER = Asset(asset_key="Cylinder", raw=b"")
-    PLANE = Asset(asset_key="Plane", raw=b"")
-    QUAD = Asset(asset_key="Quad", raw=b"")
+    SPHERE = Asset(mime_type=MIMEType.XARP_DEFAULT, raw=b"Sphere")
+    CUBE = Asset(mime_type=MIMEType.XARP_DEFAULT, raw=b"Cube")
+    CAPSULE = Asset(mime_type=MIMEType.XARP_DEFAULT, raw=b"Capsule")
+    CYLINDER = Asset(mime_type=MIMEType.XARP_DEFAULT, raw=b"Cylinder")
+    PLANE = Asset(mime_type=MIMEType.XARP_DEFAULT, raw=b"Plane")
+    QUAD = Asset(mime_type=MIMEType.XARP_DEFAULT, raw=b"Quad")
 
 
 class ImageAsset(Asset[Image.Image]):
@@ -137,8 +139,10 @@ class GLBAsset(Asset[Trimesh]):
 
 class Element(BaseModel):
     model_config = ConfigDict(
-        extra="forbid"
+        extra="forbid",
+        validate_assignment=True
     )
+
     key: str
     active: bool = True
     transform: Transform = Transform()

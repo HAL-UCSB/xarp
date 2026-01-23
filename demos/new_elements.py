@@ -32,6 +32,7 @@ def app(xr: SyncXR, kwargs: dict[str, Any]) -> None:
     xr.destroy_asset(all_assets=True)
     duck_asset = GLBAsset(asset_key="duck_asset", raw=glb_bytes)
     xr.save(duck_asset)
+    # duck_asset.raw = None # avoid resending the bytes
 
     duck = Element(
         key="duck",

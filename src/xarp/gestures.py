@@ -1,7 +1,8 @@
 from typing import Union
 
-from .spatial import cosine_similarity, distance
 import numpy as np
+
+from .spatial import cosine_similarity, distance, Vector3
 
 PALM = 0
 WRIST = 1
@@ -115,7 +116,10 @@ def palm_normal(hand):
     wrist = hand[WRIST].position
     idx_m = hand[INDEX_METACARPAL].position
     mid_m = hand[MIDDLE_METACARPAL].position
-    return np.cross(idx_m - wrist, mid_m - wrist)
+    wrist_idx_m = idx_m - wrist
+    wrist_mid_m = mid_m - wrist
+    normal_np = np.cross(wrist_idx_m.to_numpy(), wrist_mid_m.to_numpy())
+    return Vector3(normal_np)
 
 
 # ----------------- pinch gestures -----------------
