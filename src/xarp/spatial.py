@@ -72,6 +72,16 @@ class Vector3(RootModel[list[float]]):
             raise ValueError("Cannot normalize zero vector")
         return Vector3((arr / n).tolist())
 
+    def project_on_plane(self, on_plane: Self, normal: Self) -> Self:
+        n = normal.to_numpy()
+        nn = float(np.dot(n, n))
+        if nn == 0.0:
+            raise ValueError("Plane normal cannot be zero vector")
+        v = self.to_numpy()
+        p = on_plane.to_numpy()
+        projected = v - n * (np.dot(v - p, n) / nn)
+        return Vector3(projected.tolist())
+
     def __add__(self, other: Self) -> Self:
         if not isinstance(other, Vector3):
             return NotImplemented
@@ -335,6 +345,49 @@ class Quaternion(RootModel[list[float]]):
 
         m = np.column_stack((r, u, f))  # columns: right, up, forward
         return cls.from_matrix(m)
+
+    def rotate_by_euler(
+            self,
+            roll: float = 0,
+            pitch: float = 0,
+            yaw: float = 0,
+            degrees: bool = True,
+    ) -> Self:
+        """
+        Rotate this quaternion by the given Euler angles (roll, pitch, yaw).
+
+        Returns a new quaternion representing the combined rotation.
+        The rotation is applied in the quaternion's local frame.
+
+        Args:
+            roll: Rotation around X-axis
+            pitch: Rotation around Y-axis
+            yaw: Rotation around Z-axis
+            degrees: Whether angles are in degrees (True) or radians (False)
+
+        Returns:
+            New quaternion with the rotation applied
+        """
+        rotation = Quaternion.from_euler_angles(roll, pitch, yaw, degrees=degrees)
+        return self * rotation
+
+    def __mul__(self, other: Self) -> Self:
+        """
+        Quaternion multiplication (Hamilton product).
+        Returns self * other, representing applying other's rotation after self's.
+        """
+        if not isinstance(other, Quaternion):
+            raise TypeError("Can only multiply with another Quaternion")
+
+        x1, y1, z1, w1 = self.x, self.y, self.z, self.w
+        x2, y2, z2, w2 = other.x, other.y, other.z, other.w
+
+        return Quaternion.from_xyzw(
+            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+        )
 
 
 class Pose(BaseModel):

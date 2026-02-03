@@ -1,8 +1,9 @@
-from typing import Union
+from typing import Union, Tuple
 
 import numpy as np
 
-from .spatial import cosine_similarity, distance, Vector3
+from .data_models import Hands
+from .spatial import cosine_similarity, distance, Vector3, Pose
 
 PALM = 0
 WRIST = 1
@@ -79,7 +80,7 @@ FINGERS = THUMB, INDEX, MIDDLE, RING, PINKY
 DIGITS = INDEX, MIDDLE, RING, PINKY
 
 
-def finger_extension(hand, chain):
+def finger_extension(hand: Tuple[Pose, ...], chain):
     """
     chain: list of joint indices from base (metacarpal) to tip.
     Returns E in [0,1], where:
@@ -99,7 +100,7 @@ def finger_extension(hand, chain):
     return ext
 
 
-def finger_flexion(hand, chain):
+def finger_flexion(hand: Tuple[Pose, ...], chain):
     """
     Complement of finger_extension:
       1 → strongly flexed
@@ -108,7 +109,7 @@ def finger_flexion(hand, chain):
     return float(1.0 - finger_extension(hand, chain))
 
 
-def palm_normal(hand):
+def palm_normal(hand: Tuple[Pose, ...]):
     """
     Palm normal from wrist–index–middle metacarpals.
     Sign depends on coordinate convention.
@@ -124,7 +125,7 @@ def palm_normal(hand):
 
 # ----------------- pinch gestures -----------------
 
-def pinch(hand, threshold=0.015) -> Union[bool, float]:
+def pinch(hand: Tuple[Pose, ...], threshold=0.015) -> Union[bool, float]:
     """
     Thumb–index pinch. Metric: distance thumb_tip–index_tip (m).
     Default threshold ~1.5 cm.
@@ -135,21 +136,21 @@ def pinch(hand, threshold=0.015) -> Union[bool, float]:
     return dist if threshold is None else dist < threshold
 
 
-def pinch_middle(hand, threshold=0.015) -> Union[bool, float]:
+def pinch_middle(hand: Tuple[Pose, ...], threshold=0.015) -> Union[bool, float]:
     thumb_tip = hand[THUMB_TIP].position
     middle_tip = hand[MIDDLE_TIP].position
     dist = distance(middle_tip, thumb_tip)
     return dist if threshold is None else dist < threshold
 
 
-def pinch_ring(hand, threshold=0.015) -> Union[bool, float]:
+def pinch_ring(hand: Tuple[Pose, ...], threshold=0.015) -> Union[bool, float]:
     thumb_tip = hand[THUMB_TIP].position
     ring_tip = hand[RING_TIP].position
     dist = distance(ring_tip, thumb_tip)
     return dist if threshold is None else dist < threshold
 
 
-def double_pinch(hands, threshold=None) -> Union[None, float]:
+def double_pinch(hands: Hands, threshold=None) -> Union[None, float]:
     if threshold is not None:
         if not pinch(hands.left, threshold) or not pinch(hands.right, threshold):
             return None
@@ -168,7 +169,7 @@ def double_pinch(hands, threshold=None) -> Union[None, float]:
 
 # ----------------- pose / extension gestures -----------------
 
-def fist(hand, threshold=0.6) -> Union[bool, float]:
+def fist(hand: Tuple[Pose, ...], threshold=0.6) -> Union[bool, float]:
     """
     Metric: mean flexion of the four long fingers in [0,1].
     Higher → more fist-like.
@@ -179,7 +180,7 @@ def fist(hand, threshold=0.6) -> Union[bool, float]:
     return metric if threshold is None else metric > threshold
 
 
-def open_hand(hand, threshold=0.8) -> Union[bool, float]:
+def open_hand(hand: Tuple[Pose, ...], threshold=0.8) -> Union[bool, float]:
     """
     Metric: mean extension of the four long fingers in [0,1].
     Higher → more open.
@@ -190,7 +191,7 @@ def open_hand(hand, threshold=0.8) -> Union[bool, float]:
     return metric if threshold is None else metric > threshold
 
 
-def point(hand, threshold=0.3) -> Union[bool, float]:
+def point(hand: Tuple[Pose, ...], threshold=0.3) -> Union[bool, float]:
     """
     Index extended, others less extended.
     Metric = ext(index) - max(ext(middle, ring, pinky)).
@@ -205,7 +206,7 @@ def point(hand, threshold=0.3) -> Union[bool, float]:
     return metric if threshold is None else metric > threshold
 
 
-def victory(hand, threshold=0.5) -> Union[bool, float]:
+def victory(hand: Tuple[Pose, ...], threshold=0.5) -> Union[bool, float]:
     """
     Index + middle extended; ring + pinky more flexed.
     Metric = (ext(index)+ext(middle)) - (ext(ring)+ext(pinky)).
@@ -222,7 +223,7 @@ def victory(hand, threshold=0.5) -> Union[bool, float]:
 
 # ----------------- thumb orientation -----------------
 
-def thumbs_up(hand, threshold=0.7) -> Union[bool, float]:
+def thumbs_up(hand: Tuple[Pose, ...], threshold=0.7) -> Union[bool, float]:
     """
     Metric: cosine similarity between thumb direction and palm normal.
     Range [-1,1]; > 0.7 means roughly aligned.
@@ -238,7 +239,7 @@ def thumbs_up(hand, threshold=0.7) -> Union[bool, float]:
 
 # ----------------- flat palm -----------------
 
-def flat_palm(hand, threshold=0.015) -> Union[bool, float]:
+def flat_palm(hand: Tuple[Pose, ...], threshold=0.015) -> Union[bool, float]:
     """
     Metric: max distance (m) of metacarpal joints (index/middle/ring/pinky)
     from their best-fit plane. Smaller → flatter palm.
@@ -263,7 +264,7 @@ def flat_palm(hand, threshold=0.015) -> Union[bool, float]:
 
 # ----------------- coarse grab -----------------
 
-def coarse_grab(hand, threshold=0.035) -> Union[bool, float]:
+def coarse_grab(hand: Tuple[Pose, ...], threshold=0.035) -> Union[bool, float]:
     """
     Metric: mean distance (m) from thumb tip to all other fingertips.
     Lower → more closed / grab-like (no contact/force semantics).
@@ -280,3 +281,17 @@ def coarse_grab(hand, threshold=0.035) -> Union[bool, float]:
     dists = [distance(t, thumb_tip) for t in tips]
     metric = float(np.mean(dists))
     return metric if threshold is None else metric < threshold
+
+
+def index_thumb_l(hand: Tuple[Pose, ...], threshold: float = 0.3) -> bool | float:
+    index_to_palm_dist = distance(hand[INDEX_TIP].position, hand[PALM].position)
+    for other_finger_tip in (PINKY_TIP, RING_TIP, MIDDLE_TIP):
+        other_dist = distance(hand[other_finger_tip].position, hand[PALM].position)
+        if other_dist / index_to_palm_dist > .5:
+            return 0 if threshold else False
+
+    thumb_vector: Vector3 = hand[THUMB_TIP].position - hand[THUMB_DISTAL].position
+    index_vector: Vector3 = hand[INDEX_TIP].position - hand[INDEX_DISTAL].position
+    orthogonal_index_thumb = np.dot(thumb_vector.normalized().to_numpy(), index_vector.normalized().to_numpy())
+
+    return orthogonal_index_thumb if threshold is None else orthogonal_index_thumb < threshold
