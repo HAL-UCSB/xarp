@@ -67,12 +67,16 @@ class Asset(BaseModel, Generic[T]):
 
     @model_serializer(mode="plain")
     def serialize(self):
-        if self._obj is None and self.raw is None:
-            raise RuntimeError("Either raw or obj must be provided to an Asset before serializing it")
+        raw_value = None
+        if self.raw is not None:
+            raw_value = self.raw
+        elif self._obj is not None:
+            raw_value = self._obj_to_raw(self._obj)
+
         return dict(
             asset_key=self.asset_key,
             mime_type=self.mime_type,
-            raw=self.raw if self.raw is not None else self._obj_to_raw(self._obj)
+            raw=raw_value
         )
 
     @classmethod
@@ -143,13 +147,14 @@ class Element(BaseModel):
         validate_assignment=True
     )
 
-    key: str
+    key: str = ""
     active: bool = True
     transform: Transform = Transform()
     eye: Pose | None = None
     distance: float | None = None
     color: tuple[float, float, float, float] | None = None
     asset: Asset | None = None
+
 
     @model_validator(mode="after")
     def validate_asset_key_data(self):

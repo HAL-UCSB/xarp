@@ -9,6 +9,7 @@ from typing import AsyncGenerator
 
 import PIL.Image
 import requests
+from PIL.ImageDraw import ImageDraw
 
 from xarp.commands import Bundle, ResponseMode
 from xarp.commands.entities import (
@@ -69,18 +70,16 @@ class AsyncXR:
         """
         await self._execute_none(WriteCommand(text=text, title=title))
 
-    async def say(self, text: str, title: str | None = None) -> None:
-        """Displays a text message and triggers synthesized speech. Resolves when speech playback completes.
+    async def say(self, text: str) -> None:
+        """Plays synthesized speech for a text. Resolves when speech playback completes.
 
         Args:
             text: Message content to display and speak.
-            title: Optional title displayed alongside the message. (Not spoken)
-
         Returns:
             None.
         """
         await self.remote.execute(
-            Bundle(cmds=[SayCommand(text=text, title=title)], mode=ResponseMode.SINGLE)
+            Bundle(cmds=[SayCommand(text=text)], mode=ResponseMode.SINGLE)
         )
 
     async def read(self) -> str:
@@ -317,8 +316,8 @@ class SyncXR(AsyncXR):
     def write(self, text: str, title: str | None = None) -> None:
         return self._sync(super().write(text=text, title=title))
 
-    def say(self, text: str, title: str | None = None) -> None:
-        return self._sync(super().say(text=text, title=title))
+    def say(self, text: str) -> None:
+        return self._sync(super().say(text=text))
 
     def read(self) -> str:
         return self._sync(super().read())
@@ -762,6 +761,76 @@ class SyncSimpleXR(SyncXR):
             )
         )
         self.update(element)
+
+    def reconstruction_3d(self, image_asset: dict) -> bytes:
+        """Generates a GLB binary of a 3D reconstruction of the a provided image after applying a binary mask.
+
+            Args:
+                image_asset: return from the image() function
+            Returns:
+                GLB bytes. bytes of a GLB binary representing the object in the masked region.
+            """
+
+        START_SAM3D_OBJS_URL = "http://128.111.28.83:8000/start"
+        STATUS_SAM3D_OBJS_URL = "http://128.111.28.83:8000/status"
+        DOWNLOAD_SAM3D_OBJS_URL = "http://128.111.28.83:8000/download"
+
+        raw_image_bytes = image_asset["raw"] if isinstance(image_asset, dict) else image_asset
+
+        img = PIL.Image.open(BytesIO(raw_image_bytes)).convert("RGBA")
+
+        width, height = img.width, img.height
+        mask = PIL.Image.new("L", (width, height), 0)
+        draw = PIL.ImageDraw.Draw(mask)
+        radius = int(0.25 * min(width, height))  # covers most of the image
+        cx, cy = width // 2, height // 2
+        draw.ellipse(
+            (cx -
+             radius, cy - radius, cx + radius, cy + radius),
+            fill=255
+        )
+
+        img_buf = BytesIO()
+        mask_buf = BytesIO()
+
+        fmt = "png"
+        img.save(img_buf, format=fmt)
+        mask.save(mask_buf, format=fmt)
+        img.putalpha(mask)
+        img.show()
+
+        img_buf.seek(0)
+        mask_buf.seek(0)
+
+        files = {
+            "upload_image": (f"image.{fmt}", img_buf, f"image/{fmt}"),
+            "upload_mask": (f"mask.{fmt}", mask_buf, f"image/{fmt}"),
+        }
+
+        response = requests.post(
+            START_SAM3D_OBJS_URL,
+            files=files
+        )
+
+        response.raise_for_status()
+        response_data = response.json()
+        job_id = response_data["job_id"]
+
+        while True:
+            response = requests.get(
+                f"{STATUS_SAM3D_OBJS_URL}/{job_id}"
+            )
+            response.raise_for_status()
+            response_data = response.json()
+            status = response_data["status"]
+            if status == "done":
+                response = requests.get(
+                    f"{DOWNLOAD_SAM3D_OBJS_URL}/{job_id}"
+                )
+                response.raise_for_status()
+                return response.content
+            if status == "failure":
+                raise Exception("3D Reconstruction failure")
 
 
 def copy_public_methods_doc(from_class, to_class):

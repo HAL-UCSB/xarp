@@ -39,7 +39,8 @@ _ALLOWED_TOOLS = (
     "create_or_update_label",
     "create_or_update_cube",
     "create_or_update_sphere",
-    "create_or_update_image"
+    "create_or_update_image",
+    "reconstruction_3d"
 )
 
 
@@ -56,6 +57,7 @@ class ImageAssetToolInterceptor:
             self.intercepted_images.append(image_asset.obj)
             n_images = len(self.intercepted_images)
             print("Images to observe:", n_images)
+            return image_asset.model_dump()
 
         image_asset_tool.forward = _wrapper
 
@@ -94,8 +96,15 @@ def run_xr_agent(xr_agent_app: XRAgentApp, model, **kwargs) -> None:
         agent = CodeAgent(
             tools=as_agent_tools(sxr),
             model=model,
+            additional_authorized_imports=[
+                "base64",
+                "math",
+            ],
             **kwargs
         )
+
+        agent.prompt_templates["system_prompt"] = agent.prompt_templates[
+                                                      "system_prompt"] + """ You are in a right-handed coordinate system. +Y is up, +X is right, and +Z is forward. Positions and scales are in meters."""
 
         ImageAssetToolInterceptor.attach_to_agent(agent)
 

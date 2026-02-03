@@ -19,7 +19,6 @@ XRApp = Union[
     Callable[[SyncXR, dict[str, Any]], None],
 ]
 
-
 def run(xr_app: XRApp) -> None:
     app = FastAPI()
 
