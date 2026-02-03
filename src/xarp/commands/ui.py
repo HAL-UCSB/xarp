@@ -1,6 +1,8 @@
 from typing import Literal
+
 from pydantic import Field
-from . import Command, Response
+
+from . import Command
 
 
 class WriteCommand(Command):
@@ -9,8 +11,9 @@ class WriteCommand(Command):
     title: str | None = None
 
 
-class SayCommand(WriteCommand):
+class SayCommand(Command):
     cmd: Literal["say"] = Field(default="say", frozen=True)
+    text: str
 
 
 class ReadCommand(Command):

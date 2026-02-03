@@ -10,7 +10,7 @@ from xarp.entities import Element, Asset
 class CreateOrUpdateAssetsCommand(Command):
     cmd: Literal["save"] = Field(default="save", frozen=True)
     assets: list[Asset]
-    _required_attrs: ClassVar = frozenset(("asset_key", "mime_type"))
+    _required_attrs: ClassVar = frozenset(("asset_key", "mime_type", "raw"))
 
     @model_validator(mode="after")
     def _validate_assets(self):
