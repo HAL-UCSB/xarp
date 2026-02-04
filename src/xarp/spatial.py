@@ -1,5 +1,5 @@
 import math
-from typing import Optional, Self
+from typing import Self
 
 import numpy as np
 from pydantic import BaseModel, Field, ConfigDict
@@ -424,7 +424,7 @@ class Pose(BaseModel):
 
 
 class Transform(Pose):
-    parent: Optional["Transform"] = None
+    parent: str | None = None
     scale: Vector3 = Field(default_factory=Vector3.one)
 
     def to_matrix(self) -> np.ndarray:

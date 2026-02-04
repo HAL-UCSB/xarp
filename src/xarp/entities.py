@@ -155,6 +155,7 @@ class Element(BaseModel):
     color: tuple[float, float, float, float] | None = None
     asset: Asset | None = None
 
+
     @model_validator(mode="after")
     def validate_asset_key_data(self):
         if self.eye is None and self.transform is None:
