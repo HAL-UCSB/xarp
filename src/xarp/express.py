@@ -390,19 +390,19 @@ class AsyncSimpleXR(AsyncXR):
 
     async def info(self) -> dict[str, Any]:
         data = await super().info()
-        return data
+        return data.model_dump()
 
     async def eye(self) -> dict[str, Any]:
         data = await super().eye()
-        return data
+        return data.model_dump()
 
     async def head(self) -> dict[str, Any]:
         data = await super().head()
-        return data
+        return data.model_dump()
 
     async def hands(self) -> dict[str, Any]:
         data = await super().hands()
-        return data
+        return data.model_dump()
 
     async def create_or_update_glb(self, key: str, url: str,
                                    position: tuple[float, float, float] = (0, 0, 0),
