@@ -82,16 +82,6 @@ class CameraIntrinsics(BaseModel):
 
         return np.array([u, v], dtype=float)
 
-    def world_to_pixel(self, point_world: Vector3, camera_pose: Pose) -> np.ndarray:
-        """
-        World point -> pixel in *intrinsics* pixel space (sensor_resolution grid).
-        """
-        fx, fy, cx, cy = self._fx_fy_cx_cy()
-        x, y, z = self._world_to_cam(point_world, camera_pose)
-        if z <= 0.0:
-            return np.array([np.nan, np.nan], dtype=float)
-        return np.array([fx * (x / z) + cx, cy - fy * (y / z)], dtype=float)
-
     def world_point_to_panel_pixel(
             self,
             point_world: Vector3,
@@ -132,4 +122,5 @@ class DeviceInfo(BaseModel):
         extra="forbid",
     )
 
-    camera_intrinsics: CameraIntrinsics
+    rgb_intrinsics: CameraIntrinsics
+    depth_intrinsics: CameraIntrinsics
