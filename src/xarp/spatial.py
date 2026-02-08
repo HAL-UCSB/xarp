@@ -59,6 +59,10 @@ class Vector3(RootModel[list[float]]):
     def right() -> Self:
         return Vector3([1.0, 0, 0])
 
+    @staticmethod
+    def left() -> Self:
+        return Vector3([-1.0, 0, 0])
+
     def to_numpy(self) -> np.ndarray:
         return np.array(self.root, dtype=float)
 
@@ -417,7 +421,7 @@ class Pose(BaseModel):
         return T @ R @ S
 
     def ray(self, d: float) -> Vector3:
-        forward = Vector3.from_xyz(0, 0, 1)
+        forward = Vector3.forward()
         R = self.rotation.to_matrix()  # 3x3
         world_dir = R @ forward.to_numpy()
         return Vector3(self.position.to_numpy() + d * world_dir)

@@ -8,7 +8,7 @@
 uv add git+https://github.com/HAL-UCSB/xarp.git
 
 # agents and MCP
-uv add git+https://github.com/HAL-UCSB/xarp.git --optional agents 
+uv add git+https://github.com/HAL-UCSB/xarp.git --extra agents 
 ```
 
 ## Cite

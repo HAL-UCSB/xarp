@@ -9,7 +9,6 @@ from typing import AsyncGenerator
 
 import PIL.Image
 import requests
-from PIL.ImageDraw import ImageDraw
 
 from xarp.commands import Bundle, ResponseMode
 from xarp.commands.entities import (
@@ -390,16 +389,20 @@ class SyncXR(AsyncXR):
 class AsyncSimpleXR(AsyncXR):
 
     async def info(self) -> dict[str, Any]:
-        return await super().info().model_dump()
+        data = await super().info()
+        return data.model_dump()
 
     async def eye(self) -> dict[str, Any]:
-        return await super().eye().model_dump()
+        data = await super().eye()
+        return data.model_dump()
 
     async def head(self) -> dict[str, Any]:
-        return await super().head().model_dump()
+        data = await super().head()
+        return data.model_dump()
 
     async def hands(self) -> dict[str, Any]:
-        return await super().hands().model_dump()
+        data = await super().hands()
+        return data.model_dump()
 
     async def create_or_update_glb(self, key: str, url: str,
                                    position: tuple[float, float, float] = (0, 0, 0),
@@ -446,7 +449,6 @@ class AsyncSimpleXR(AsyncXR):
     async def create_or_update_label(self, key: str, text: str,
                                      position: tuple[float, float, float] = (0, 0, 0),
                                      euler_angles: tuple[float, float, float] = (0, 0, 0),
-                                     scale: tuple[float, float, float] = (1, 1, 1),
                                      color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
         """Create or update a text label element in the scene.
 
@@ -458,7 +460,6 @@ class AsyncSimpleXR(AsyncXR):
             position: World-space position (x, y, z).
             euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
                 in radians.
-            scale: Non-uniform scale factors (x, y, z).
             color: RGBA color multiplier with components in [0.0, 1.0].
 
         Returns:
@@ -471,7 +472,7 @@ class AsyncSimpleXR(AsyncXR):
             transform=Transform(
                 position=Vector3.from_xyz(*position),
                 rotation=Quaternion.from_euler_angles(*euler_angles),
-                scale=Vector3.from_xyz(*scale),
+                scale=Vector3.one(),
             )
         )
         self.update(element)
@@ -584,13 +585,13 @@ class SyncSimpleXR(SyncXR):
     def info(self) -> dict[str, Any]:
         return super().info().model_dump()
 
-    def eye(self) -> dict[str, Any]:
+    def eye(self) -> dict[str, tuple[float, float, float]]:
         return super().eye().model_dump()
 
-    def head(self) -> dict[str, Any]:
+    def head(self) -> dict[str, tuple[float, float, float]]:
         return super().head().model_dump()
 
-    def hands(self) -> dict[str, Any]:
+    def hands(self) -> dict:
         return super().hands().model_dump()
 
     def create_or_update_glb(self, key: str, raw: bytes,
@@ -608,7 +609,7 @@ class SyncSimpleXR(SyncXR):
             raw: Raw bytes of the GLB asset.
             position: World-space position (x, y, z).
             euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
-                in radians.
+                in degrees.
             scale: Non-uniform scale factors (x, y, z).
             color: RGBA color multiplier with components in [0.0, 1.0].
 
@@ -630,7 +631,6 @@ class SyncSimpleXR(SyncXR):
     def create_or_update_label(self, key: str, text: str,
                                position: tuple[float, float, float] = (0, 0, 0),
                                euler_angles: tuple[float, float, float] = (0, 0, 0),
-                               scale: tuple[float, float, float] = (1, 1, 1),
                                color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
         """Create or update a text label element in the scene.
 
@@ -641,8 +641,7 @@ class SyncSimpleXR(SyncXR):
             text: Text content of the label.
             position: World-space position (x, y, z).
             euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
-                in radians.
-            scale: Non-uniform scale factors (x, y, z).
+                in degrees.
             color: RGBA color multiplier with components in [0.0, 1.0].
 
         Returns:
@@ -655,7 +654,7 @@ class SyncSimpleXR(SyncXR):
             transform=Transform(
                 position=Vector3.from_xyz(*position),
                 rotation=Quaternion.from_euler_angles(*euler_angles),
-                scale=Vector3.from_xyz(*scale),
+                scale=Vector3.one(),
             )
         )
         self.update(element)
@@ -673,7 +672,7 @@ class SyncSimpleXR(SyncXR):
             key: Unique identifier for the element.
             position: World-space position (x, y, z).
             euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
-                in radians.
+                in degrees.
             scale: Non-uniform scale factors (x, y, z).
             color: RGBA color multiplier with components in [0.0, 1.0].
 
@@ -705,7 +704,7 @@ class SyncSimpleXR(SyncXR):
             key: Unique identifier for the element.
             position: World-space position (x, y, z).
             euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
-                in radians.
+                in degrees.
             scale: Non-uniform scale factors (x, y, z).
             color: RGBA color multiplier with components in [0.0, 1.0].
 
@@ -740,7 +739,7 @@ class SyncSimpleXR(SyncXR):
             base_64: Base64-encoded image data.
             position: World-space position (x, y, z).
             euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
-                in radians.
+                in degrees.
             scale: Non-uniform scale factors (x, y, z).
             color: RGBA color multiplier with components in [0.0, 1.0].
 
@@ -761,76 +760,6 @@ class SyncSimpleXR(SyncXR):
             )
         )
         self.update(element)
-
-    def reconstruction_3d(self, image_asset: dict) -> bytes:
-        """Generates a GLB binary of a 3D reconstruction of the a provided image after applying a binary mask.
-
-            Args:
-                image_asset: return from the image() function
-            Returns:
-                GLB bytes. bytes of a GLB binary representing the object in the masked region.
-            """
-
-        START_SAM3D_OBJS_URL = "http://128.111.28.83:8000/start"
-        STATUS_SAM3D_OBJS_URL = "http://128.111.28.83:8000/status"
-        DOWNLOAD_SAM3D_OBJS_URL = "http://128.111.28.83:8000/download"
-
-        raw_image_bytes = image_asset["raw"] if isinstance(image_asset, dict) else image_asset
-
-        img = PIL.Image.open(BytesIO(raw_image_bytes)).convert("RGBA")
-
-        width, height = img.width, img.height
-        mask = PIL.Image.new("L", (width, height), 0)
-        draw = PIL.ImageDraw.Draw(mask)
-        radius = int(0.25 * min(width, height))  # covers most of the image
-        cx, cy = width // 2, height // 2
-        draw.ellipse(
-            (cx -
-             radius, cy - radius, cx + radius, cy + radius),
-            fill=255
-        )
-
-        img_buf = BytesIO()
-        mask_buf = BytesIO()
-
-        fmt = "png"
-        img.save(img_buf, format=fmt)
-        mask.save(mask_buf, format=fmt)
-        img.putalpha(mask)
-        img.show()
-
-        img_buf.seek(0)
-        mask_buf.seek(0)
-
-        files = {
-            "upload_image": (f"image.{fmt}", img_buf, f"image/{fmt}"),
-            "upload_mask": (f"mask.{fmt}", mask_buf, f"image/{fmt}"),
-        }
-
-        response = requests.post(
-            START_SAM3D_OBJS_URL,
-            files=files
-        )
-
-        response.raise_for_status()
-        response_data = response.json()
-        job_id = response_data["job_id"]
-
-        while True:
-            response = requests.get(
-                f"{STATUS_SAM3D_OBJS_URL}/{job_id}"
-            )
-            response.raise_for_status()
-            response_data = response.json()
-            status = response_data["status"]
-            if status == "done":
-                response = requests.get(
-                    f"{DOWNLOAD_SAM3D_OBJS_URL}/{job_id}"
-                )
-                response.raise_for_status()
-                return response.content
-            if status == "failure":
-                raise Exception("3D Reconstruction failure")
 
 
 def copy_public_methods_doc(from_class, to_class):

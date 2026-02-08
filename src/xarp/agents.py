@@ -97,14 +97,20 @@ def run_xr_agent(xr_agent_app: XRAgentApp, model, **kwargs) -> None:
             tools=as_agent_tools(sxr),
             model=model,
             additional_authorized_imports=[
+                "numpy",
+                "numpy.linalg",
                 "base64",
                 "math",
+                "time",
             ],
             **kwargs
         )
 
-        agent.prompt_templates["system_prompt"] = agent.prompt_templates[
-                                                      "system_prompt"] + """ You are in a right-handed coordinate system. +Y is up, +X is right, and +Z is forward. Positions and scales are in meters."""
+        xr_prompt = """
+        You are in a right-handed coordinate system. +X is right, +Y is up, and +Z is forward.
+        Positions and scales are in meters.
+        """
+        agent.prompt_templates["system_prompt"] = agent.prompt_templates["system_prompt"] + xr_prompt
 
         ImageAssetToolInterceptor.attach_to_agent(agent)
 

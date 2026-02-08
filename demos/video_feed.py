@@ -61,7 +61,7 @@ async def cursor_panel(axr: AsyncXR, kwargs: dict[str, Any]) -> None:
         if hands.right:
             img = panel.asset.obj
             cursor = hands.right[INDEX_TIP]
-            pixel = info.camera_intrinsics.world_point_to_panel_pixel(
+            pixel = info.rgb_intrinsics.world_point_to_panel_pixel(
                 cursor.position,
                 panel.eye,
                 img.width,
