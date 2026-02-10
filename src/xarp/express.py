@@ -393,12 +393,30 @@ class AsyncSimpleXR(AsyncXR):
 
     async def image(self) -> str:
         """
-        Capture an image from the main device camera
+        Captures one RGB image of the physical environment from the user's point of view.
         Returns:
-            PNG image encoded in base64
+            URL to retrieve a PNG.
         """
-        data = await super().image()
-        return data.to_base64()
+        asset = await super().image()
+        return serve_pil_image_ephemeral(asset.obj)
+
+    async def virtual_image(self) -> str:
+        """
+        Captures one RGB image of the virtual environment from the user's point of view.
+        Returns:
+            URL to retrieve a PNG.
+        """
+        asset = await super().virtual_image()
+        return serve_pil_image_ephemeral(asset.obj)
+
+    async def depth(self) -> str:
+        """
+        Captures one depth frame of the physical environment.
+        Returns:
+            URL to retrieve a PNG.
+        """
+        asset = await super().depth()
+        return serve_pil_image_ephemeral(asset.obj)
 
     async def virtual_image(self) -> str:
         """
@@ -611,33 +629,6 @@ class AsyncSimpleXR(AsyncXR):
 
 
 class SyncSimpleXR(SyncXR):
-
-    def image(self) -> str:
-        """
-        Captures one RGB image of the physical environment from the user's point of view.
-        Returns:
-            URL to retrieve a PNG.
-        """
-        asset = super().image()
-        return serve_pil_image_ephemeral(asset.obj)
-
-    def virtual_image(self) -> str:
-        """
-        Captures one RGB image of the virtual environment from the user's point of view.
-        Returns:
-            URL to retrieve a PNG.
-        """
-        asset = super().virtual_image()
-        return serve_pil_image_ephemeral(asset.obj)
-
-    def depth(self) -> str:
-        """
-        Captures one depth frame of the physical environment.
-        Returns:
-            URL to retrieve a PNG.
-        """
-        asset = super().depth()
-        return serve_pil_image_ephemeral(asset.obj)
 
     def info(self) -> dict[str, Any]:
         return super().info().model_dump()
