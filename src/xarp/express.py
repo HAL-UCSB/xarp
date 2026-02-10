@@ -405,7 +405,7 @@ class AsyncSimpleXR(AsyncXR):
         buf.seek(0)
         return MCPImage(data=buf.getvalue(), format="png")
 
-    async def virtual_image(self) -> str:
+    async def virtual_image(self) -> MCPImage:
         """
         Captures one RGB image of the virtual environment from the user's point of view.
         Returns:
@@ -417,7 +417,7 @@ class AsyncSimpleXR(AsyncXR):
         buf.seek(0)
         return MCPImage(data=buf.getvalue(), format="png")
 
-    async def depth(self) -> str:
+    async def depth(self) -> MCPImage:
         """
         Captures one depth frame of the physical environment.
         Returns:
@@ -428,24 +428,6 @@ class AsyncSimpleXR(AsyncXR):
         asset.obj.save(buf, format="PNG")
         buf.seek(0)
         return MCPImage(data=buf.getvalue(), format="png")
-
-    async def virtual_image(self) -> str:
-        """
-        Capture an image of the virtual space from the user perspective
-        Returns:
-            PNG image encoded in base64
-        """
-        data = await super().virtual_image()
-        return data.to_base64()
-
-    async def depth(self) -> str:
-        """
-        Capture a depth image from the main device camera
-        Returns:
-            PNG image encoded in base64
-        """
-        data = await super().depth()
-        return data.to_base64()
 
     async def info(self) -> dict[str, Any]:
         data = await super().info()
