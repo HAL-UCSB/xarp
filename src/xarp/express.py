@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import secrets
+import socket
 import threading
 import types
 from io import BytesIO
@@ -839,7 +840,6 @@ def serve_pil_image_ephemeral(
         img: PIL.Image.Image,
         *,
         ttl_seconds: int = 60,
-        host: str = "127.0.0.1",
         port: int = 0,  # 0 => choose an ephemeral free port
         path: str = "/image.png",
         fmt: str = "PNG",
@@ -887,6 +887,10 @@ def serve_pil_image_ephemeral(
 
     # Freeze expected token in closure safely
     token_expected = token
+
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.connect(("8.8.8.8", 80))
+        host = s.getsockname()[0]
 
     # Build uvicorn server programmatically so we can shut it down cleanly
     config = uvicorn.Config(
