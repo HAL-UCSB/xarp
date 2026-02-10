@@ -1,3 +1,4 @@
+import base64
 import mimetypes
 from enum import Enum
 from io import BytesIO
@@ -101,6 +102,10 @@ class DefaultAssets:
 class ImageAsset(Asset[Image.Image]):
     mime_type: Literal[MIMEType.PNG, MIMEType.JPEG] = Field(default=MIMEType.PNG, frozen=True)
 
+    def to_base64(self) -> str:
+        raw = self._obj_to_raw()
+        return base64.b64encode(raw).decode()
+
     def _obj_to_raw(self, obj: Image.Image) -> bytes:
         buf = BytesIO()
         data_format = self.mime_type.split("/")[-1]
@@ -154,7 +159,6 @@ class Element(BaseModel):
     distance: float | None = None
     color: tuple[float, float, float, float] | None = None
     asset: Asset | None = None
-
 
     @model_validator(mode="after")
     def validate_asset_key_data(self):

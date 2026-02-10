@@ -127,17 +127,17 @@ def run_mcp():
         await remote.start()
         asxr = AsyncSimpleXR(remote)
 
-        mcp = FastMCP(
-            argv[1],
-            host="127.0.0.1",
-            port=argv[2]
-        )
+        mcp = FastMCP(argv[1])
 
         for name, method in _get_public_methods(asxr):
             mcp.tool(method)
 
         try:
-            await mcp.run_http_async(show_banner=False)
+            await mcp.run_http_async(
+                show_banner=False,
+                host="127.0.0.1",
+                port=int(argv[2])
+            )
         finally:
             remote.stop()
 
