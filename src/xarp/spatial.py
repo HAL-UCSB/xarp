@@ -415,7 +415,7 @@ class Pose(BaseModel):
 
         # Translation matrix
         T = np.eye(4)
-        T[:3, 3] = np.asarray(self.position, dtype=float)
+        T[:3, 3] = self.position.to_numpy()
 
         # Combine (T * R * S)
         return T @ R @ S

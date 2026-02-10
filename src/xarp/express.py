@@ -29,6 +29,7 @@ from xarp.commands.ui import WriteCommand, SayCommand, ReadCommand, PassthroughC
 from xarp.data_models import DeviceInfo, Hands
 from xarp.entities import ImageAsset, Asset, Element, GLBAsset, TextAsset, DefaultAssets
 from xarp.remote import RemoteXRClient
+from xarp.server import serve_pil_image_ephemeral
 from xarp.spatial import Pose, Transform, Vector3, Quaternion
 
 
@@ -388,21 +389,48 @@ class SyncXR(AsyncXR):
 
 class AsyncSimpleXR(AsyncXR):
 
+    async def image(self) -> str:
+        """
+        Capture an image from the main device camera
+        Returns:
+            PNG image encoded in base64
+        """
+        data = await super().image()
+        return data.to_base64()
+
+    async def virtual_image(self) -> str:
+        """
+        Capture an image of the virtual space from the user perspective
+        Returns:
+            PNG image encoded in base64
+        """
+        data = await super().virtual_image()
+        return data.to_base64()
+
+    async def depth(self) -> str:
+        """
+        Capture a depth image from the main device camera
+        Returns:
+            PNG image encoded in base64
+        """
+        data = await super().depth()
+        return data.to_base64()
+
     async def info(self) -> dict[str, Any]:
         data = await super().info()
-        return data
+        return data.model_dump()
 
     async def eye(self) -> dict[str, Any]:
         data = await super().eye()
-        return data
+        return data.model_dump()
 
     async def head(self) -> dict[str, Any]:
         data = await super().head()
-        return data
+        return data.model_dump()
 
     async def hands(self) -> dict[str, Any]:
         data = await super().hands()
-        return data
+        return data.model_dump()
 
     async def create_or_update_glb(self, key: str, url: str,
                                    position: tuple[float, float, float] = (0, 0, 0),
@@ -581,6 +609,33 @@ class AsyncSimpleXR(AsyncXR):
 
 
 class SyncSimpleXR(SyncXR):
+
+    def image(self) -> str:
+        """
+        Captures one RGB image of the physical environment from the user's point of view.
+        Returns:
+            URL to retrieve a PNG.
+        """
+        asset = super().image()
+        return serve_pil_image_ephemeral(asset.obj)
+
+    def virtual_image(self) -> str:
+        """
+        Captures one RGB image of the virtual environment from the user's point of view.
+        Returns:
+            URL to retrieve a PNG.
+        """
+        asset = super().virtual_image()
+        return serve_pil_image_ephemeral(asset.obj)
+
+    def depth(self) -> str:
+        """
+        Captures one depth frame of the physical environment.
+        Returns:
+            URL to retrieve a PNG.
+        """
+        asset = super().depth()
+        return serve_pil_image_ephemeral(asset.obj)
 
     def info(self) -> dict[str, Any]:
         return super().info().model_dump()
