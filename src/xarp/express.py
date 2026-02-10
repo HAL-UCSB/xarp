@@ -13,6 +13,7 @@ import PIL.Image
 import requests
 import uvicorn
 from fastapi import FastAPI, HTTPException, Response
+from mcp.server.fastmcp import Image as MCPImage
 
 from xarp.commands import Bundle, ResponseMode
 from xarp.commands.entities import (
@@ -392,32 +393,41 @@ class SyncXR(AsyncXR):
 
 class AsyncSimpleXR(AsyncXR):
 
-    async def image(self) -> str:
+    async def image(self) -> MCPImage:
         """
         Captures one RGB image of the physical environment from the user's point of view.
         Returns:
-            URL to retrieve a PNG.
+            An Image in PNG format.
         """
-        asset = await super().image()
-        return serve_pil_image_ephemeral(asset.obj)
+        asset: ImageAsset = await super().image()
+        buf = BytesIO()
+        asset.obj.save(buf, format="PNG")
+        buf.seek(0)
+        return MCPImage(data=buf.getvalue(), format="png")
 
     async def virtual_image(self) -> str:
         """
         Captures one RGB image of the virtual environment from the user's point of view.
         Returns:
-            URL to retrieve a PNG.
+            An Image in PNG format.
         """
         asset = await super().virtual_image()
-        return serve_pil_image_ephemeral(asset.obj)
+        buf = BytesIO()
+        asset.obj.save(buf, format="PNG")
+        buf.seek(0)
+        return MCPImage(data=buf.getvalue(), format="png")
 
     async def depth(self) -> str:
         """
         Captures one depth frame of the physical environment.
         Returns:
-            URL to retrieve a PNG.
+            An image in PNG format.
         """
         asset = await super().depth()
-        return serve_pil_image_ephemeral(asset.obj)
+        buf = BytesIO()
+        asset.obj.save(buf, format="PNG")
+        buf.seek(0)
+        return MCPImage(data=buf.getvalue(), format="png")
 
     async def virtual_image(self) -> str:
         """
