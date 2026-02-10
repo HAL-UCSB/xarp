@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import secrets
 import threading
 import types
 from io import BytesIO
@@ -9,6 +10,8 @@ from typing import AsyncGenerator
 
 import PIL.Image
 import requests
+import uvicorn
+from fastapi import FastAPI, HTTPException, Response
 
 from xarp.commands import Bundle, ResponseMode
 from xarp.commands.entities import (
@@ -29,7 +32,6 @@ from xarp.commands.ui import WriteCommand, SayCommand, ReadCommand, PassthroughC
 from xarp.data_models import DeviceInfo, Hands
 from xarp.entities import ImageAsset, Asset, Element, GLBAsset, TextAsset, DefaultAssets
 from xarp.remote import RemoteXRClient
-from xarp.server import serve_pil_image_ephemeral
 from xarp.spatial import Pose, Transform, Vector3, Quaternion
 
 
@@ -831,3 +833,103 @@ def copy_public_methods_doc(from_class, to_class):
 
 
 copy_public_methods_doc(AsyncXR, SyncXR)
+
+
+def serve_pil_image_ephemeral(
+        img: PIL.Image.Image,
+        *,
+        ttl_seconds: int = 60,
+        host: str = "127.0.0.1",
+        port: int = 0,  # 0 => choose an ephemeral free port
+        path: str = "/image.png",
+        fmt: str = "PNG",
+) -> str:
+    """
+    Returns a local URL that serves `img` for at most `ttl_seconds`, via a FastAPI app.
+    Side effect: spins up a uvicorn server in a background thread and shuts it down after TTL.
+
+    Notes:
+      - This serves on localhost by default (not publicly reachable).
+      - If you set host="0.0.0.0", it may be reachable on your LAN (firewall permitting).
+    """
+    if ttl_seconds <= 0:
+        raise ValueError("ttl_seconds must be > 0")
+
+    # Encode the image once (avoid re-encoding per request)
+    buf = BytesIO()
+    img.save(buf, format=fmt)
+    payload = buf.getvalue()
+
+    content_type = {
+        "PNG": "image/png",
+        "JPEG": "image/jpeg",
+        "JPG": "image/jpeg",
+        "WEBP": "image/webp",
+        "GIF": "image/gif",
+        "BMP": "image/bmp",
+        "TIFF": "image/tiff",
+    }.get(fmt.upper(), "application/octet-stream")
+
+    token = secrets.token_urlsafe(16)
+    served_path = path if path.startswith("/") else "/" + path
+
+    app = FastAPI()
+
+    @app.get(served_path)
+    def get_image(token: str):
+        if token != token_expected:
+            raise HTTPException(status_code=404, detail="Not found")
+        return Response(
+            content=payload,
+            media_type=content_type,
+            headers={"Cache-Control": "no-store"},
+        )
+
+    # Freeze expected token in closure safely
+    token_expected = token
+
+    # Build uvicorn server programmatically so we can shut it down cleanly
+    config = uvicorn.Config(
+        app,
+        host=host,
+        port=port,
+        log_level="warning",
+        access_log=False,
+        lifespan="off",
+    )
+    server = uvicorn.Server(config)
+
+    # Run uvicorn in a background thread
+    def _run():
+        server.run()
+
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
+
+    # Wait until server socket is created and port is known
+    # (uvicorn sets server.servers once started)
+    import time
+    deadline = time.time() + 5.0
+    while time.time() < deadline:
+        if getattr(server, "servers", None):
+            break
+        time.sleep(0.01)
+    if not getattr(server, "servers", None):
+        # couldn't start in time
+        server.should_exit = True
+        raise RuntimeError("Uvicorn server failed to start")
+
+    # Extract actual bound port (handles port=0)
+    # server.servers is a list; each has .sockets
+    sockets = server.servers[0].sockets
+    actual_port = sockets[0].getsockname()[1]
+
+    # Schedule teardown after TTL
+    def _shutdown():
+        server.should_exit = True
+
+    timer = threading.Timer(ttl_seconds, _shutdown)
+    timer.daemon = True
+    timer.start()
+
+    return f"http://{host}:{actual_port}{served_path}?token={token}"
