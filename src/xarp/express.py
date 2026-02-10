@@ -13,7 +13,7 @@ import PIL.Image
 import requests
 import uvicorn
 from fastapi import FastAPI, HTTPException, Response
-from mcp.server.fastmcp import Image as MCPImage
+from fastmcp.utilities.types import Image as MCPImage
 
 from xarp.commands import Bundle, ResponseMode
 from xarp.commands.entities import (
