@@ -400,9 +400,21 @@ class AsyncSimpleXR(AsyncXR):
             An Image in PNG format.
         """
         asset: ImageAsset = await super().image()
+        img = asset.obj.copy()
+
+        max_width = 640
+
+        if img.width > max_width:
+            new_height = int((max_width / img.width) * img.height)
+            img = img.resize(
+                (max_width, new_height),
+                PIL.Image.Resampling.LANCZOS
+            )
+
         buf = BytesIO()
-        asset.obj.save(buf, format="PNG")
+        img.save(buf, format="PNG")
         buf.seek(0)
+
         return MCPImage(data=buf.getvalue(), format="png")
 
     async def virtual_image(self) -> MCPImage:
@@ -411,10 +423,22 @@ class AsyncSimpleXR(AsyncXR):
         Returns:
             An Image in PNG format.
         """
-        asset = await super().virtual_image()
+        asset: ImageAsset = await super().virtual_image()
+        img = asset.obj.copy()
+
+        max_width = 640
+
+        if img.width > max_width:
+            new_height = int((max_width / img.width) * img.height)
+            img = img.resize(
+                (max_width, new_height),
+                PIL.Image.Resampling.LANCZOS
+            )
+
         buf = BytesIO()
-        asset.obj.save(buf, format="PNG")
+        img.save(buf, format="PNG")
         buf.seek(0)
+
         return MCPImage(data=buf.getvalue(), format="png")
 
     async def depth(self) -> MCPImage:
@@ -423,10 +447,22 @@ class AsyncSimpleXR(AsyncXR):
         Returns:
             An image in PNG format.
         """
-        asset = await super().depth()
+        asset: ImageAsset = await super().depth()
+        img = asset.obj.copy()
+
+        max_width = 640
+
+        if img.width > max_width:
+            new_height = int((max_width / img.width) * img.height)
+            img = img.resize(
+                (max_width, new_height),
+                PIL.Image.Resampling.LANCZOS
+            )
+
         buf = BytesIO()
-        asset.obj.save(buf, format="PNG")
+        img.save(buf, format="PNG")
         buf.seek(0)
+
         return MCPImage(data=buf.getvalue(), format="png")
 
     async def info(self) -> dict[str, Any]:
