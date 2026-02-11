@@ -516,7 +516,7 @@ class AsyncSimpleXR(AsyncXR):
                 scale=Vector3.one(),
             )
         )
-        self.update(element)
+        await self.update(element)
 
     async def create_or_update_cube(self, key: str,
                                     position: tuple[float, float, float] = (0, 0, 0),
