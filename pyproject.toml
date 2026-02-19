@@ -18,6 +18,7 @@ dependencies = [
     "python-multipart>=0.0.21",
     "qrcode[pil]>=8.2",
     "requests>=2.32.5",
+    "scipy-stubs~=1.17.0",
     "trimesh>=4.11.0",
     "uvicorn>=0.40.0",
     "websockets>=15.0.1",
@@ -31,6 +32,7 @@ build-backend = "hatchling.build"
 dev = [
     "matplotlib>=3.10.8",
     "pandas>=3.0.0",
+    "scipy>=1.17.0",
     "ty>=0.0.8",
 ]
 

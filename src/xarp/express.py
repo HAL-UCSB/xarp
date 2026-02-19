@@ -13,7 +13,6 @@ import PIL.Image
 import requests
 import uvicorn
 from fastapi import FastAPI, HTTPException, Response
-from fastmcp.utilities.types import Image as MCPImage
 
 from xarp.commands import Bundle, ResponseMode
 from xarp.commands.entities import (
@@ -391,454 +390,6 @@ class SyncXR(AsyncXR):
         return self._sync(super().destroy_element(element=element, all_elements=all_elements))
 
 
-class AsyncSimpleXR(AsyncXR):
-
-    async def image(self) -> MCPImage:
-        """
-        Captures one RGB image of the physical environment from the user's point of view.
-        Returns:
-            An Image in PNG format.
-        """
-        asset: ImageAsset = await super().image()
-        img = asset.obj.copy()
-
-        max_width = 640
-
-        if img.width > max_width:
-            new_height = int((max_width / img.width) * img.height)
-            img = img.resize(
-                (max_width, new_height),
-                PIL.Image.Resampling.LANCZOS
-            )
-
-        buf = BytesIO()
-        img.save(buf, format="PNG")
-        buf.seek(0)
-
-        return MCPImage(data=buf.getvalue(), format="png")
-
-    async def virtual_image(self) -> MCPImage:
-        """
-        Captures one RGB image of the virtual environment from the user's point of view.
-        Returns:
-            An Image in PNG format.
-        """
-        asset: ImageAsset = await super().virtual_image()
-        img = asset.obj.copy()
-
-        max_width = 640
-
-        if img.width > max_width:
-            new_height = int((max_width / img.width) * img.height)
-            img = img.resize(
-                (max_width, new_height),
-                PIL.Image.Resampling.LANCZOS
-            )
-
-        buf = BytesIO()
-        img.save(buf, format="PNG")
-        buf.seek(0)
-
-        return MCPImage(data=buf.getvalue(), format="png")
-
-    async def depth(self) -> MCPImage:
-        """
-        Captures one depth frame of the physical environment.
-        Returns:
-            An image in PNG format.
-        """
-        asset: ImageAsset = await super().depth()
-        img = asset.obj.copy()
-
-        max_width = 640
-
-        if img.width > max_width:
-            new_height = int((max_width / img.width) * img.height)
-            img = img.resize(
-                (max_width, new_height),
-                PIL.Image.Resampling.LANCZOS
-            )
-
-        buf = BytesIO()
-        img.save(buf, format="PNG")
-        buf.seek(0)
-
-        return MCPImage(data=buf.getvalue(), format="png")
-
-    async def info(self) -> dict[str, Any]:
-        data = await super().info()
-        return data.model_dump()
-
-    async def eye(self) -> dict[str, Any]:
-        data = await super().eye()
-        return data.model_dump()
-
-    async def head(self) -> dict[str, Any]:
-        data = await super().head()
-        return data.model_dump()
-
-    async def hands(self) -> dict[str, Any]:
-        data = await super().hands()
-        return data.model_dump()
-
-    async def create_or_update_glb(self, key: str, url: str,
-                                   position: tuple[float, float, float] = (0, 0, 0),
-                                   euler_angles: tuple[float, float, float] = (0, 0, 0),
-                                   scale: tuple[float, float, float] = (1, 1, 1),
-                                   color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
-        """Create or update a GLB-based element in the scene.
-
-        If an element with the given key already exists, it is replaced.
-        Otherwise, a new element is created and added.
-
-        Args:
-            key: Unique identifier for the element.
-            url: URL to download the GLB asset.
-            position: World-space position (x, y, z).
-            euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
-                in radians.
-            scale: Non-uniform scale factors (x, y, z).
-            color: RGBA color multiplier with components in [0.0, 1.0].
-
-        Returns:
-            None
-        """
-        response = requests.get(
-            url,
-            headers={"User-Agent": "python"},
-            timeout=10
-        )
-        response.raise_for_status()
-        glb_bytes = response.content
-
-        element = Element(
-            key=key,
-            asset=GLBAsset(asset_key=f"asset_{key}", raw=glb_bytes),
-            color=color,
-            transform=Transform(
-                position=Vector3.from_xyz(*position),
-                rotation=Quaternion.from_euler_angles(*euler_angles),
-                scale=Vector3.from_xyz(*scale),
-            )
-        )
-        await self.update(element)
-
-    async def create_or_update_label(self, key: str, text: str,
-                                     position: tuple[float, float, float] = (0, 0, 0),
-                                     euler_angles: tuple[float, float, float] = (0, 0, 0),
-                                     color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
-        """Create or update a text label element in the scene.
-
-        The label is rendered as a text-based asset positioned in 3D space.
-
-        Args:
-            key: Unique identifier for the element.
-            text: Text content of the label.
-            position: World-space position (x, y, z).
-            euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
-                in radians.
-            color: RGBA color multiplier with components in [0.0, 1.0].
-
-        Returns:
-            None
-        """
-        element = Element(
-            key=key,
-            asset=TextAsset.from_obj(text),
-            color=color,
-            transform=Transform(
-                position=Vector3.from_xyz(*position),
-                rotation=Quaternion.from_euler_angles(*euler_angles),
-                scale=Vector3.one(),
-            )
-        )
-        await self.update(element)
-
-    async def create_or_update_cube(self, key: str,
-                                    position: tuple[float, float, float] = (0, 0, 0),
-                                    euler_angles: tuple[float, float, float] = (0, 0, 0),
-                                    scale: tuple[float, float, float] = (1, 1, 1),
-                                    color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
-        """Create or update a cube primitive element in the scene.
-
-        Uses the default cube asset.
-
-        Args:
-            key: Unique identifier for the element.
-            position: World-space position (x, y, z).
-            euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
-                in radians.
-            scale: Non-uniform scale factors (x, y, z).
-            color: RGBA color multiplier with components in [0.0, 1.0].
-
-        Returns:
-            None
-        """
-        element = Element(
-            key=key,
-            asset=DefaultAssets.CUBE,
-            color=color,
-            transform=Transform(
-                position=Vector3.from_xyz(*position),
-                rotation=Quaternion.from_euler_angles(*euler_angles),
-                scale=Vector3.from_xyz(*scale),
-            )
-        )
-        await self.update(element)
-
-    async def create_or_update_sphere(self, key: str,
-                                      position: tuple[float, float, float] = (0, 0, 0),
-                                      euler_angles: tuple[float, float, float] = (0, 0, 0),
-                                      scale: tuple[float, float, float] = (1, 1, 1),
-                                      color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
-        """Create or update a sphere primitive element in the scene.
-
-        Uses the default sphere asset.
-
-        Args:
-            key: Unique identifier for the element.
-            position: World-space position (x, y, z).
-            euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
-                in radians.
-            scale: Non-uniform scale factors (x, y, z).
-            color: RGBA color multiplier with components in [0.0, 1.0].
-
-        Returns:
-            None
-        """
-        element = Element(
-            key=key,
-            asset=DefaultAssets.SPHERE,
-            color=color,
-            transform=Transform(
-                position=Vector3.from_xyz(*position),
-                rotation=Quaternion.from_euler_angles(*euler_angles),
-                scale=Vector3.from_xyz(*scale),
-            )
-        )
-        await self.update(element)
-
-    async def create_or_update_image(self, key: str,
-                                     base_64: str,
-                                     position: tuple[float, float, float] = (0, 0, 0),
-                                     euler_angles: tuple[float, float, float] = (0, 0, 0),
-                                     scale: tuple[float, float, float] = (1, 1, 1),
-                                     color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
-        """Create or update an image-based element in the scene.
-
-        The image is decoded from a base64-encoded string and converted to
-        an RGBA texture.
-
-        Args:
-            key: Unique identifier for the element.
-            base_64: Base64-encoded image data.
-            position: World-space position (x, y, z).
-            euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
-                in radians.
-            scale: Non-uniform scale factors (x, y, z).
-            color: RGBA color multiplier with components in [0.0, 1.0].
-
-        Returns:
-            None
-        """
-        decoded = base64.b64decode(base_64)
-        buffer = BytesIO(decoded)
-        img = PIL.Image.open(buffer).convert("RGBA")
-        element = Element(
-            key=key,
-            asset=ImageAsset.from_obj(img),
-            color=color,
-            transform=Transform(
-                position=Vector3.from_xyz(*position),
-                rotation=Quaternion.from_euler_angles(*euler_angles),
-                scale=Vector3.from_xyz(*scale),
-            )
-        )
-        await self.update(element)
-
-
-class SyncSimpleXR(SyncXR):
-
-    def info(self) -> dict[str, Any]:
-        return super().info().model_dump()
-
-    def eye(self) -> dict[str, tuple[float, float, float]]:
-        return super().eye().model_dump()
-
-    def head(self) -> dict[str, tuple[float, float, float]]:
-        return super().head().model_dump()
-
-    def hands(self) -> dict:
-        return super().hands().model_dump()
-
-    def create_or_update_glb(self, key: str, raw: bytes,
-                             position: tuple[float, float, float] = (0, 0, 0),
-                             euler_angles: tuple[float, float, float] = (0, 0, 0),
-                             scale: tuple[float, float, float] = (1, 1, 1),
-                             color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
-        """Create or update a GLB-based element in the scene.
-
-        If an element with the given key already exists, it is replaced.
-        Otherwise, a new element is created and added.
-
-        Args:
-            key: Unique identifier for the element.
-            raw: Raw bytes of the GLB asset.
-            position: World-space position (x, y, z).
-            euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
-                in degrees.
-            scale: Non-uniform scale factors (x, y, z).
-            color: RGBA color multiplier with components in [0.0, 1.0].
-
-        Returns:
-            None
-        """
-        element = Element(
-            key=key,
-            asset=GLBAsset(asset_key=f"asset_{key}", raw=raw),
-            color=color,
-            transform=Transform(
-                position=Vector3.from_xyz(*position),
-                rotation=Quaternion.from_euler_angles(*euler_angles),
-                scale=Vector3.from_xyz(*scale),
-            )
-        )
-        self.update(element)
-
-    def create_or_update_label(self, key: str, text: str,
-                               position: tuple[float, float, float] = (0, 0, 0),
-                               euler_angles: tuple[float, float, float] = (0, 0, 0),
-                               color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
-        """Create or update a text label element in the scene.
-
-        The label is rendered as a text-based asset positioned in 3D space.
-
-        Args:
-            key: Unique identifier for the element.
-            text: Text content of the label.
-            position: World-space position (x, y, z).
-            euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
-                in degrees.
-            color: RGBA color multiplier with components in [0.0, 1.0].
-
-        Returns:
-            None
-        """
-        element = Element(
-            key=key,
-            asset=TextAsset.from_obj(text),
-            color=color,
-            transform=Transform(
-                position=Vector3.from_xyz(*position),
-                rotation=Quaternion.from_euler_angles(*euler_angles),
-                scale=Vector3.one(),
-            )
-        )
-        self.update(element)
-
-    def create_or_update_cube(self, key: str,
-                              position: tuple[float, float, float] = (0, 0, 0),
-                              euler_angles: tuple[float, float, float] = (0, 0, 0),
-                              scale: tuple[float, float, float] = (1, 1, 1),
-                              color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
-        """Create or update a cube primitive element in the scene.
-
-        Uses the default cube asset.
-
-        Args:
-            key: Unique identifier for the element.
-            position: World-space position (x, y, z).
-            euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
-                in degrees.
-            scale: Non-uniform scale factors (x, y, z).
-            color: RGBA color multiplier with components in [0.0, 1.0].
-
-        Returns:
-            None
-        """
-        element = Element(
-            key=key,
-            asset=DefaultAssets.CUBE,
-            color=color,
-            transform=Transform(
-                position=Vector3.from_xyz(*position),
-                rotation=Quaternion.from_euler_angles(*euler_angles),
-                scale=Vector3.from_xyz(*scale),
-            )
-        )
-        self.update(element)
-
-    def create_or_update_sphere(self, key: str,
-                                position: tuple[float, float, float] = (0, 0, 0),
-                                euler_angles: tuple[float, float, float] = (0, 0, 0),
-                                scale: tuple[float, float, float] = (1, 1, 1),
-                                color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
-        """Create or update a sphere primitive element in the scene.
-
-        Uses the default sphere asset.
-
-        Args:
-            key: Unique identifier for the element.
-            position: World-space position (x, y, z).
-            euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
-                in degrees.
-            scale: Non-uniform scale factors (x, y, z).
-            color: RGBA color multiplier with components in [0.0, 1.0].
-
-        Returns:
-            None
-        """
-        element = Element(
-            key=key,
-            asset=DefaultAssets.SPHERE,
-            color=color,
-            transform=Transform(
-                position=Vector3.from_xyz(*position),
-                rotation=Quaternion.from_euler_angles(*euler_angles),
-                scale=Vector3.from_xyz(*scale),
-            )
-        )
-        self.update(element)
-
-    def create_or_update_image(self, key: str,
-                               base_64: str,
-                               position: tuple[float, float, float] = (0, 0, 0),
-                               euler_angles: tuple[float, float, float] = (0, 0, 0),
-                               scale: tuple[float, float, float] = (1, 1, 1),
-                               color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
-        """Create or update an image-based element in the scene.
-
-        The image is decoded from a base64-encoded string and converted to
-        an RGBA texture.
-
-        Args:
-            key: Unique identifier for the element.
-            base_64: Base64-encoded image data.
-            position: World-space position (x, y, z).
-            euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
-                in degrees.
-            scale: Non-uniform scale factors (x, y, z).
-            color: RGBA color multiplier with components in [0.0, 1.0].
-
-        Returns:
-            None
-        """
-        decoded = base64.b64decode(base_64)
-        buffer = BytesIO(decoded)
-        img = PIL.Image.open(buffer).convert("RGBA")
-        element = Element(
-            key=key,
-            asset=ImageAsset.from_obj(img),
-            color=color,
-            transform=Transform(
-                position=Vector3.from_xyz(*position),
-                rotation=Quaternion.from_euler_angles(*euler_angles),
-                scale=Vector3.from_xyz(*scale),
-            )
-        )
-        self.update(element)
-
-
 def copy_public_methods_doc(from_class, to_class):
     for name, member in to_class.__dict__.items():
         if name.startswith("_"):
@@ -956,3 +507,465 @@ def serve_pil_image_ephemeral(
     timer.start()
 
     return f"http://{host}:{actual_port}{served_path}?token={token}"
+
+
+"""
+============================================================================ AGENTS
+"""
+
+agents_available = False
+try:
+    from fastmcp.utilities.types import Image as MCPImage
+
+    agents_available = True
+except:
+    pass
+
+if agents_available:
+
+    class AsyncSimpleXR(AsyncXR):
+
+        async def image(self) -> MCPImage:
+            """
+            Captures one RGB image of the physical environment from the user's point of view.
+            Returns:
+                An Image in PNG format.
+            """
+            asset: ImageAsset = await super().image()
+            img = asset.obj.copy()
+
+            max_width = 640
+
+            if img.width > max_width:
+                new_height = int((max_width / img.width) * img.height)
+                img = img.resize(
+                    (max_width, new_height),
+                    PIL.Image.Resampling.LANCZOS
+                )
+
+            buf = BytesIO()
+            img.save(buf, format="PNG")
+            buf.seek(0)
+
+            return MCPImage(data=buf.getvalue(), format="png")
+
+        async def virtual_image(self) -> MCPImage:
+            """
+            Captures one RGB image of the virtual environment from the user's point of view.
+            Returns:
+                An Image in PNG format.
+            """
+            asset: ImageAsset = await super().virtual_image()
+            img = asset.obj.copy()
+
+            max_width = 640
+
+            if img.width > max_width:
+                new_height = int((max_width / img.width) * img.height)
+                img = img.resize(
+                    (max_width, new_height),
+                    PIL.Image.Resampling.LANCZOS
+                )
+
+            buf = BytesIO()
+            img.save(buf, format="PNG")
+            buf.seek(0)
+
+            return MCPImage(data=buf.getvalue(), format="png")
+
+        async def depth(self) -> MCPImage:
+            """
+            Captures one depth frame of the physical environment.
+            Returns:
+                An image in PNG format.
+            """
+            asset: ImageAsset = await super().depth()
+            img = asset.obj.copy()
+
+            max_width = 640
+
+            if img.width > max_width:
+                new_height = int((max_width / img.width) * img.height)
+                img = img.resize(
+                    (max_width, new_height),
+                    PIL.Image.Resampling.LANCZOS
+                )
+
+            buf = BytesIO()
+            img.save(buf, format="PNG")
+            buf.seek(0)
+
+            return MCPImage(data=buf.getvalue(), format="png")
+
+        async def info(self) -> dict[str, Any]:
+            data = await super().info()
+            return data.model_dump()
+
+        async def eye(self) -> dict[str, Any]:
+            data = await super().eye()
+            return data.model_dump()
+
+        async def head(self) -> dict[str, Any]:
+            data = await super().head()
+            return data.model_dump()
+
+        async def hands(self) -> dict[str, Any]:
+            data = await super().hands()
+            return data.model_dump()
+
+        async def create_or_update_glb(self, key: str, url: str,
+                                       position: tuple[float, float, float] = (0, 0, 0),
+                                       euler_angles: tuple[float, float, float] = (0, 0, 0),
+                                       scale: tuple[float, float, float] = (1, 1, 1),
+                                       color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
+            """Create or update a GLB-based element in the scene.
+
+            If an element with the given key already exists, it is replaced.
+            Otherwise, a new element is created and added.
+
+            Args:
+                key: Unique identifier for the element.
+                url: URL to download the GLB asset.
+                position: World-space position (x, y, z).
+                euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
+                    in radians.
+                scale: Non-uniform scale factors (x, y, z).
+                color: RGBA color multiplier with components in [0.0, 1.0].
+
+            Returns:
+                None
+            """
+            response = requests.get(
+                url,
+                headers={"User-Agent": "python"},
+                timeout=10
+            )
+            response.raise_for_status()
+            glb_bytes = response.content
+
+            element = Element(
+                key=key,
+                asset=GLBAsset(asset_key=f"asset_{key}", raw=glb_bytes),
+                color=color,
+                transform=Transform(
+                    position=Vector3.from_xyz(*position),
+                    rotation=Quaternion.from_euler_angles(*euler_angles),
+                    scale=Vector3.from_xyz(*scale),
+                )
+            )
+            await self.update(element)
+
+        async def create_or_update_label(self, key: str, text: str,
+                                         position: tuple[float, float, float] = (0, 0, 0),
+                                         euler_angles: tuple[float, float, float] = (0, 0, 0),
+                                         color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
+            """Create or update a text label element in the scene.
+
+            The label is rendered as a text-based asset positioned in 3D space.
+
+            Args:
+                key: Unique identifier for the element.
+                text: Text content of the label.
+                position: World-space position (x, y, z).
+                euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
+                    in radians.
+                color: RGBA color multiplier with components in [0.0, 1.0].
+
+            Returns:
+                None
+            """
+            element = Element(
+                key=key,
+                asset=TextAsset.from_obj(text),
+                color=color,
+                transform=Transform(
+                    position=Vector3.from_xyz(*position),
+                    rotation=Quaternion.from_euler_angles(*euler_angles),
+                    scale=Vector3.one(),
+                )
+            )
+            await self.update(element)
+
+        async def create_or_update_cube(self, key: str,
+                                        position: tuple[float, float, float] = (0, 0, 0),
+                                        euler_angles: tuple[float, float, float] = (0, 0, 0),
+                                        scale: tuple[float, float, float] = (1, 1, 1),
+                                        color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
+            """Create or update a cube primitive element in the scene.
+
+            Uses the default cube asset.
+
+            Args:
+                key: Unique identifier for the element.
+                position: World-space position (x, y, z).
+                euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
+                    in radians.
+                scale: Non-uniform scale factors (x, y, z).
+                color: RGBA color multiplier with components in [0.0, 1.0].
+
+            Returns:
+                None
+            """
+            element = Element(
+                key=key,
+                asset=DefaultAssets.CUBE,
+                color=color,
+                transform=Transform(
+                    position=Vector3.from_xyz(*position),
+                    rotation=Quaternion.from_euler_angles(*euler_angles),
+                    scale=Vector3.from_xyz(*scale),
+                )
+            )
+            await self.update(element)
+
+        async def create_or_update_sphere(self, key: str,
+                                          position: tuple[float, float, float] = (0, 0, 0),
+                                          euler_angles: tuple[float, float, float] = (0, 0, 0),
+                                          scale: tuple[float, float, float] = (1, 1, 1),
+                                          color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
+            """Create or update a sphere primitive element in the scene.
+
+            Uses the default sphere asset.
+
+            Args:
+                key: Unique identifier for the element.
+                position: World-space position (x, y, z).
+                euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
+                    in radians.
+                scale: Non-uniform scale factors (x, y, z).
+                color: RGBA color multiplier with components in [0.0, 1.0].
+
+            Returns:
+                None
+            """
+            element = Element(
+                key=key,
+                asset=DefaultAssets.SPHERE,
+                color=color,
+                transform=Transform(
+                    position=Vector3.from_xyz(*position),
+                    rotation=Quaternion.from_euler_angles(*euler_angles),
+                    scale=Vector3.from_xyz(*scale),
+                )
+            )
+            await self.update(element)
+
+        async def create_or_update_image(self, key: str,
+                                         base_64: str,
+                                         position: tuple[float, float, float] = (0, 0, 0),
+                                         euler_angles: tuple[float, float, float] = (0, 0, 0),
+                                         scale: tuple[float, float, float] = (1, 1, 1),
+                                         color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
+            """Create or update an image-based element in the scene.
+
+            The image is decoded from a base64-encoded string and converted to
+            an RGBA texture.
+
+            Args:
+                key: Unique identifier for the element.
+                base_64: Base64-encoded image data.
+                position: World-space position (x, y, z).
+                euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
+                    in radians.
+                scale: Non-uniform scale factors (x, y, z).
+                color: RGBA color multiplier with components in [0.0, 1.0].
+
+            Returns:
+                None
+            """
+            decoded = base64.b64decode(base_64)
+            buffer = BytesIO(decoded)
+            img = PIL.Image.open(buffer).convert("RGBA")
+            element = Element(
+                key=key,
+                asset=ImageAsset.from_obj(img),
+                color=color,
+                transform=Transform(
+                    position=Vector3.from_xyz(*position),
+                    rotation=Quaternion.from_euler_angles(*euler_angles),
+                    scale=Vector3.from_xyz(*scale),
+                )
+            )
+            await self.update(element)
+
+
+    class SyncSimpleXR(SyncXR):
+
+        def info(self) -> dict[str, Any]:
+            return super().info().model_dump()
+
+        def eye(self) -> dict[str, tuple[float, float, float]]:
+            return super().eye().model_dump()
+
+        def head(self) -> dict[str, tuple[float, float, float]]:
+            return super().head().model_dump()
+
+        def hands(self) -> dict:
+            return super().hands().model_dump()
+
+        def create_or_update_glb(self, key: str, raw: bytes,
+                                 position: tuple[float, float, float] = (0, 0, 0),
+                                 euler_angles: tuple[float, float, float] = (0, 0, 0),
+                                 scale: tuple[float, float, float] = (1, 1, 1),
+                                 color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
+            """Create or update a GLB-based element in the scene.
+
+            If an element with the given key already exists, it is replaced.
+            Otherwise, a new element is created and added.
+
+            Args:
+                key: Unique identifier for the element.
+                raw: Raw bytes of the GLB asset.
+                position: World-space position (x, y, z).
+                euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
+                    in degrees.
+                scale: Non-uniform scale factors (x, y, z).
+                color: RGBA color multiplier with components in [0.0, 1.0].
+
+            Returns:
+                None
+            """
+            element = Element(
+                key=key,
+                asset=GLBAsset(asset_key=f"asset_{key}", raw=raw),
+                color=color,
+                transform=Transform(
+                    position=Vector3.from_xyz(*position),
+                    rotation=Quaternion.from_euler_angles(*euler_angles),
+                    scale=Vector3.from_xyz(*scale),
+                )
+            )
+            self.update(element)
+
+        def create_or_update_label(self, key: str, text: str,
+                                   position: tuple[float, float, float] = (0, 0, 0),
+                                   euler_angles: tuple[float, float, float] = (0, 0, 0),
+                                   color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
+            """Create or update a text label element in the scene.
+
+            The label is rendered as a text-based asset positioned in 3D space.
+
+            Args:
+                key: Unique identifier for the element.
+                text: Text content of the label.
+                position: World-space position (x, y, z).
+                euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
+                    in degrees.
+                color: RGBA color multiplier with components in [0.0, 1.0].
+
+            Returns:
+                None
+            """
+            element = Element(
+                key=key,
+                asset=TextAsset.from_obj(text),
+                color=color,
+                transform=Transform(
+                    position=Vector3.from_xyz(*position),
+                    rotation=Quaternion.from_euler_angles(*euler_angles),
+                    scale=Vector3.one(),
+                )
+            )
+            self.update(element)
+
+        def create_or_update_cube(self, key: str,
+                                  position: tuple[float, float, float] = (0, 0, 0),
+                                  euler_angles: tuple[float, float, float] = (0, 0, 0),
+                                  scale: tuple[float, float, float] = (1, 1, 1),
+                                  color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
+            """Create or update a cube primitive element in the scene.
+
+            Uses the default cube asset.
+
+            Args:
+                key: Unique identifier for the element.
+                position: World-space position (x, y, z).
+                euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
+                    in degrees.
+                scale: Non-uniform scale factors (x, y, z).
+                color: RGBA color multiplier with components in [0.0, 1.0].
+
+            Returns:
+                None
+            """
+            element = Element(
+                key=key,
+                asset=DefaultAssets.CUBE,
+                color=color,
+                transform=Transform(
+                    position=Vector3.from_xyz(*position),
+                    rotation=Quaternion.from_euler_angles(*euler_angles),
+                    scale=Vector3.from_xyz(*scale),
+                )
+            )
+            self.update(element)
+
+        def create_or_update_sphere(self, key: str,
+                                    position: tuple[float, float, float] = (0, 0, 0),
+                                    euler_angles: tuple[float, float, float] = (0, 0, 0),
+                                    scale: tuple[float, float, float] = (1, 1, 1),
+                                    color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
+            """Create or update a sphere primitive element in the scene.
+
+            Uses the default sphere asset.
+
+            Args:
+                key: Unique identifier for the element.
+                position: World-space position (x, y, z).
+                euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
+                    in degrees.
+                scale: Non-uniform scale factors (x, y, z).
+                color: RGBA color multiplier with components in [0.0, 1.0].
+
+            Returns:
+                None
+            """
+            element = Element(
+                key=key,
+                asset=DefaultAssets.SPHERE,
+                color=color,
+                transform=Transform(
+                    position=Vector3.from_xyz(*position),
+                    rotation=Quaternion.from_euler_angles(*euler_angles),
+                    scale=Vector3.from_xyz(*scale),
+                )
+            )
+            self.update(element)
+
+        def create_or_update_image(self, key: str,
+                                   base_64: str,
+                                   position: tuple[float, float, float] = (0, 0, 0),
+                                   euler_angles: tuple[float, float, float] = (0, 0, 0),
+                                   scale: tuple[float, float, float] = (1, 1, 1),
+                                   color: tuple[float, float, float, float] = (1, 1, 1, 1)) -> None:
+            """Create or update an image-based element in the scene.
+
+            The image is decoded from a base64-encoded string and converted to
+            an RGBA texture.
+
+            Args:
+                key: Unique identifier for the element.
+                base_64: Base64-encoded image data.
+                position: World-space position (x, y, z).
+                euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
+                    in degrees.
+                scale: Non-uniform scale factors (x, y, z).
+                color: RGBA color multiplier with components in [0.0, 1.0].
+
+            Returns:
+                None
+            """
+            decoded = base64.b64decode(base_64)
+            buffer = BytesIO(decoded)
+            img = PIL.Image.open(buffer).convert("RGBA")
+            element = Element(
+                key=key,
+                asset=ImageAsset.from_obj(img),
+                color=color,
+                transform=Transform(
+                    position=Vector3.from_xyz(*position),
+                    rotation=Quaternion.from_euler_angles(*euler_angles),
+                    scale=Vector3.from_xyz(*scale),
+                )
+            )
+            self.update(element)

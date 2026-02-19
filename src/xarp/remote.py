@@ -23,6 +23,46 @@ class ResponseException(Exception):
         super().__init__(f"Command {incoming.xid} raised an exception: {incoming.value}")
 
 
+class LatestQueue:
+    """
+    O(1) put and get. Drops all but the latest normal frame.
+    EOS and error frames are never dropped, they queue separately
+    and take priority over any pending value.
+    """
+
+    def __init__(self):
+        self._event = asyncio.Event()
+        self._latest: Response | None = None
+        self._terminals: asyncio.Queue[Response] = asyncio.Queue()
+        self._shutdown = False
+
+    def put_nowait(self, item: Response) -> None:
+        if self._shutdown:
+            raise QueueShutDown
+        if item.eos or item.error:
+            self._terminals.put_nowait(item)
+        else:
+            self._latest = item  # overwrites previous, dropping it
+        self._event.set()
+
+    async def get(self) -> Response:
+        while True:
+            if self._shutdown:
+                raise QueueShutDown
+            if not self._terminals.empty():
+                return self._terminals.get_nowait()
+            if self._latest is not None:
+                item, self._latest = self._latest, None
+                self._event.clear()
+                return item
+            self._event.clear()
+            await self._event.wait()
+
+    def shutdown(self) -> None:
+        self._shutdown = True
+        self._event.set()  # unblock any waiter in get()
+
+
 class RemoteXRClient:
 
     def __init__(self, ws: WebSocket, heartbeat_timeout: float | None = None):
@@ -34,7 +74,7 @@ class RemoteXRClient:
         self._monitor_heartbeat_task: asyncio.Task | None = None
         self._heartbeat_timeout = heartbeat_timeout if heartbeat_timeout is not None else settings.heartbeat_timeout_secs
         self._pending_singles: dict[int, asyncio.Future[Response]] = dict()
-        self._pending_streams: dict[int, asyncio.Queue[Response]] = dict()
+        self._pending_streams: dict[int, asyncio.Queue[Response] | LatestQueue] = dict()
         self.notification_callbacks: list[Callable[..., Awaitable[None]]] = []
         self._last_received_heartbeat = 0
 
@@ -75,7 +115,6 @@ class RemoteXRClient:
             while True:
                 heartbeat = Notification()
                 await self._send(heartbeat)
-                # print('[XARP] sent heartbeat')
                 await asyncio.sleep(self._heartbeat_timeout / 2)
         except asyncio.CancelledError:
             raise
@@ -89,7 +128,6 @@ class RemoteXRClient:
             while True:
                 incoming = await self._receive()
                 self._last_received_heartbeat = utc_ts()
-                # print('[XARP] received heartbeat')
 
                 match incoming.type:
                     case MessageType.NOTIFICATION:
@@ -140,13 +178,13 @@ class RemoteXRClient:
 
         self._raise_waiters(exception)
 
-    def _raise_waiters(self, exception: BaseException):
+    def _raise_waiters(self, exception: BaseException) -> None:
         for fut in self._pending_singles.values():
             if not fut.done():
                 fut.set_exception(exception)
         self._pending_singles.clear()
 
-        for xid, queue in self._pending_streams.items():
+        for queue in self._pending_streams.values():
             queue.shutdown()
         self._pending_streams.clear()
 
@@ -173,7 +211,6 @@ class RemoteXRClient:
                 await gather
 
     def _next_xid(self) -> int:
-        # increment and warp around int
         self._xid_counter = (self._xid_counter + 1) & 0xFFFFFFFFFFFFFFFF
         return self._xid_counter
 
@@ -199,7 +236,10 @@ class RemoteXRClient:
         cancel_stream = Bundle(
             cmds=[Cancel(target_xid=bundle.xid)],
             mode=ResponseMode.NONE)
-        queue: asyncio.Queue[Response] = asyncio.Queue()
+
+        queue: LatestQueue | asyncio.Queue[Response] = (
+            LatestQueue() if bundle.rt else asyncio.Queue()
+        )
         self._pending_streams[bundle.xid] = queue
         await self._send(bundle)
 
@@ -209,9 +249,6 @@ class RemoteXRClient:
             try:
                 while True:
                     item = await queue.get()
-                    if bundle.rt:
-                        while not queue.empty():
-                            item = queue.get_nowait()
                     if eos := item.eos:
                         break
                     if item.error:
