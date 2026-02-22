@@ -8,9 +8,9 @@ from xarp.server import run, show_qrcode_link
 from xarp.spatial import Transform, Vector3
 
 gray = (.5, .5, .5, 1)
-red = (1, 0, 0, 1)
-green = (0, 1, 0, 1)
-blue = (0, 0, 1, 1)
+red = (1, 0, 0, .5)
+green = (0, 1, 0, .5)
+blue = (0, 0, 1, .5)
 
 brush = Element(
     key="cursor",

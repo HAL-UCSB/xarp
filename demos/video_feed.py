@@ -100,4 +100,4 @@ async def depth_filter_panel(axr: AsyncXR, kwargs):
 
 if __name__ == '__main__':
     show_qrcode_link()
-    run(depth_panel)
+    run(rgb_panel)

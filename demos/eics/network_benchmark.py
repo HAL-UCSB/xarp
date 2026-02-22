@@ -13,19 +13,22 @@ from xarp.settings import settings
 # -------------------- Grid + Benchmark config (override via params) --------------------
 DEFAULT = {
     # grid:
-    "grid_modes": ("single", ),#"grid_modes": ("stream", "single"),                 # any subset of ("stream","single")
-    "grid_modalities_universe": ("head", "hands", "image"),
-    "grid_min_k": 1,                                   # min subset size
-    "grid_max_k": None,                                # None => full universe size
+    "grid_modes": ("stream", ),  # "grid_modes": ("stream", "single"),
+    "grid_modalities_universe": ("head", "hands" ), #"grid_modalities_universe": ("head", "hands", "image"),
+    "grid_min_k": 1,
+    "grid_max_k": None,
 
     # per benchmark:
     "runs": 3,
     "n": 1000,
     "warmup": 10,
 
-
     # output:
-    "csv_path": None,                                  # None => auto filename
+    "csv_path": None,
+
+    # NEW: job slicing (1-based, inclusive)
+    "start_job": 1,     # run from this job index onward
+    "end_job": None,    # optional: stop after this job index (inclusive)
 }
 
 
@@ -163,6 +166,9 @@ def _bench_combo_minimal(xarp: SyncXR, mode: str, modalities: tuple[str, ...], n
     }
 
 
+
+
+
 # -------------------- Grid search driver (run() entrypoint) --------------------
 def grid_bench_minimal(xarp: SyncXR, params=None, n: int = DEFAULT["n"]):
     params = params or {}
@@ -180,12 +186,30 @@ def grid_bench_minimal(xarp: SyncXR, params=None, n: int = DEFAULT["n"]):
     csv_path = params.get("csv_path", DEFAULT["csv_path"]) or _default_csv_path()
     os.makedirs(os.path.dirname(csv_path) or ".", exist_ok=True)
 
+    # NEW: job range controls (1-based, inclusive)
+    start_job = int(params.get("start_job", DEFAULT["start_job"]))
+    end_job = params.get("end_job", DEFAULT["end_job"])
+    end_job = int(end_job) if end_job is not None else None
+
+    if start_job < 1:
+        raise ValueError(f"start_job must be >= 1 (got {start_job})")
+
     # build grid
     combos = []
     for k in range(min_k, max_k + 1):
         combos.extend(combinations(universe, k))
 
     total_jobs = len(modes) * len(combos)
+
+    if start_job > total_jobs:
+        raise ValueError(f"start_job={start_job} exceeds total_jobs={total_jobs}")
+
+    if end_job is not None:
+        if end_job < start_job:
+            raise ValueError(f"end_job must be >= start_job (got end_job={end_job}, start_job={start_job})")
+        if end_job > total_jobs:
+            raise ValueError(f"end_job={end_job} exceeds total_jobs={total_jobs}")
+
     session_id = datetime.now().isoformat(timespec="seconds")
 
     fieldnames = [
@@ -197,8 +221,6 @@ def grid_bench_minimal(xarp: SyncXR, params=None, n: int = DEFAULT["n"]):
         "runs",
         "n_per_run",
         "warmup_per_run",
-
-        # minimal sufficient set (+ CI half-widths):
         "fps_mean",
         "fps_ci95_half",
         "p50_ms_mean",
@@ -220,6 +242,13 @@ def grid_bench_minimal(xarp: SyncXR, params=None, n: int = DEFAULT["n"]):
 
             for modalities in combos:
                 job += 1
+
+                # NEW: skip / stop logic
+                if job < start_job:
+                    continue
+                if end_job is not None and job > end_job:
+                    break
+
                 label = "+".join(modalities)
                 print(f"[{job:03d}/{total_jobs}] {mode:6s}  {label}  (k={len(modalities)})")
 
@@ -238,7 +267,6 @@ def grid_bench_minimal(xarp: SyncXR, params=None, n: int = DEFAULT["n"]):
                 }
                 w.writerow(row)
 
-                # short console summary
                 print(
                     f"  fps={s['fps_mean']:.2f}±{s['fps_ci95_half']:.2f}  "
                     f"p50={s['p50_ms_mean']:.3f}±{s['p50_ms_ci95_half']:.3f}ms  "
@@ -246,10 +274,17 @@ def grid_bench_minimal(xarp: SyncXR, params=None, n: int = DEFAULT["n"]):
                     f"h2={100*s['hitch2_rate_mean']:.2f}%±{100*s['hitch2_rate_ci95_half']:.2f}%"
                 )
 
+            # NEW: if end_job hit inside combos loop, break outer loop too
+            if end_job is not None and job >= end_job:
+                break
+
     print("\n" + "-" * 78)
     print(f"Grid finished. CSV written to: {csv_path}")
     print(f"Universe={universe}  modes={modes}  combos={len(combos)}  jobs={total_jobs}")
     print(f"Per job: runs={runs} n/run={n} warmup/run={warmup}")
+    if start_job != 1 or end_job is not None:
+        print(f"Job slice: start_job={start_job} end_job={end_job}")
+
 
 
 if __name__ == "__main__":

@@ -2,7 +2,6 @@ from typing import Literal, ClassVar
 
 from pydantic import Field
 from pydantic import model_validator
-
 from xarp.commands import Command
 from xarp.entities import Element, Asset
 
@@ -10,7 +9,8 @@ from xarp.entities import Element, Asset
 class CreateOrUpdateAssetsCommand(Command):
     cmd: Literal["save"] = Field(default="save", frozen=True)
     assets: list[Asset]
-    _required_attrs: ClassVar = frozenset(("asset_key", "mime_type", "raw"))
+    alt_path: str | None = None
+    _required_attrs: ClassVar = frozenset(("asset_key", "mime_type", "obj"))
 
     @model_validator(mode="after")
     def _validate_assets(self):

@@ -13,7 +13,6 @@ import PIL.Image
 import requests
 import uvicorn
 from fastapi import FastAPI, HTTPException, Response
-
 from xarp.commands import Bundle, ResponseMode
 from xarp.commands.entities import (
     ListAssetsCommand,
@@ -210,14 +209,14 @@ class AsyncXR:
 
     # ---- ASSETS ----
 
-    async def save(self, asset: Asset) -> None:
+    async def save(self, asset: Asset, alt_path: str = None) -> None:
         """Stores an asset on the XR device.
         Args:
             asset: asset object to be stored on the device.
         Returns:
             None.
         """
-        await self._execute_single(CreateOrUpdateAssetsCommand(assets=[asset]))
+        await self._execute_single(CreateOrUpdateAssetsCommand(assets=[asset], alt_path=alt_path))
 
     async def list_assets(self) -> list[str]:
         """Lists stored asset keys.
@@ -371,8 +370,8 @@ class SyncXR(AsyncXR):
         return AsyncGeneratorIterator(agen, self._loop)
 
     # ---- ENTITIES ----
-    def save(self, asset: Asset) -> None:
-        return self._sync(super().save(asset))
+    def save(self, asset: Asset, alt_path: str = None) -> None:
+        return self._sync(super().save(asset, alt_path=alt_path))
 
     def list_assets(self) -> list[str]:
         return self._sync(super().list_assets())
