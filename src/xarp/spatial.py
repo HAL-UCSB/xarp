@@ -404,21 +404,10 @@ class Pose(BaseModel):
     rotation: Quaternion = Field(default_factory=Quaternion.identity)
 
     def to_matrix(self) -> np.ndarray:
-        # Scale matrix
-        S = np.eye(4)
-        S[0, 0] = 1
-        S[1, 1] = 1
-        S[2, 2] = 1
-
-        # Rotation matrix
-        R = self.rotation.to_matrix()
-
-        # Translation matrix
-        T = np.eye(4)
-        T[:3, 3] = self.position.to_numpy()
-
-        # Combine (T * R * S)
-        return T @ R @ S
+        M = np.eye(4, dtype=np.float32)
+        M[:3, :3] = self.rotation.to_matrix()
+        M[:3, 3] = self.position.to_numpy()
+        return M
 
     def ray(self, d: float) -> Vector3:
         forward = Vector3.forward()
