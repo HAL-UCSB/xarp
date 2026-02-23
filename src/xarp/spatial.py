@@ -422,7 +422,7 @@ class Transform(Pose):
 
     def to_matrix(self) -> np.ndarray:
         matrix = super().to_matrix()
-        M[:3, :3] *= self.scale.to_numpy()
+        matrix[:3, :3] *= self.scale.to_numpy()
         return matrix
 
     def world_matrix(self) -> np.ndarray:
