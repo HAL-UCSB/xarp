@@ -1,0 +1,46 @@
+[project]
+name = "xarp"
+version = "0.1.0"
+description = "Python XR toolkit for humans and AI agents"
+readme = "README.md"
+authors = [
+    { name = "caetanolab", email = "152355265+caetanolab@users.noreply.github.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi[standard]>=0.128.0",
+    "ipykernel>=7.2.0",
+    "msgpack>=1.1.2",
+    "numpy==2.4.1",
+    "pillow>=12.1.0",
+    "pydantic>=2.12.5",
+    "pydantic-settings>=2.12.0",
+    "python-multipart>=0.0.21",
+    "qrcode[pil]>=8.2",
+    "requests>=2.32.5",
+    "scipy-stubs~=1.17.0",
+    "trimesh>=4.11.0",
+    "uvicorn>=0.40.0",
+    "websockets>=15.0.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "matplotlib>=3.10.8",
+    "pandas>=3.0.0",
+    "scipy>=1.17.0",
+    "ty>=0.0.8",
+]
+
+[project.optional-dependencies]
+agents = [
+    "fastmcp>=2.14.3",
+    "smolagents[openai,toolkit]>=1.24.0",
+]
+
+[project.scripts]
+xarp_mcp = "xarp.agents:run_mcp"
