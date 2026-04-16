@@ -2,13 +2,14 @@ import base64
 import mimetypes
 from enum import Enum
 from io import BytesIO
-from typing import Any, Literal, ClassVar, TypeVar, Generic, Self, Annotated
+from typing import Any, Literal, ClassVar, TypeVar, Generic, Self
 
 import trimesh
 from PIL import Image
-from pydantic import BaseModel, model_validator, SkipValidation
+from pydantic import BaseModel, SkipValidation
 from pydantic import ConfigDict, model_serializer, Field
 from trimesh import Trimesh
+
 from xarp.spatial import Transform
 
 T = TypeVar("T")
@@ -179,6 +180,7 @@ class Element(BaseModel):
     transform: Transform = Field(default_factory=Transform)
     color: tuple[float, float, float, float] | None = None  # RGBA, components in [0, 1]
     asset: SkipValidation[Asset[Any]] | None = None
+    parent: str | None = None
 
     play: bool | None = None
     time: float | None = None
