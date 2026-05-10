@@ -34,9 +34,10 @@ response.raise_for_status()
 glb_bytes = response.content
 
 # -------------------------
-# VIDEO (PUBLIC DOMAIN - NASA)
+# VIDEO (CC-BY Nature Clip - Internet Archive)
 # -------------------------
-video_url = "https://images-assets.nasa.gov/video/NHQ_2020_0304_MarsPerseverance/NHQ_2020_0304_MarsPerseverance~orig.mp4"
+video_url = "https://archive.org/download/ChineseLanternCCBYNatureClip/Chinese%20lantern%20CC-BY%20NatureClip.mp4"
+
 response = requests.get(
     video_url,
     headers={"User-Agent": "python"},
