@@ -79,7 +79,7 @@ def app(xr: SyncXR, kwargs: dict[str, Any]) -> None:
             position=Vector3.forward(),
         )
     )
-    xr.update(video)
+    #xr.update(video)
 
     stream = xr.sense(hands=True)
     for frame in stream:
