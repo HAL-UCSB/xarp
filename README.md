@@ -2,10 +2,6 @@
 XR Python toolkit for humans and AI agents. Check the demos to get started.
 
 ## Demos
-[brush]: https://github.com/user-attachments/assets/630a5fe5-3dcc-45d1-85d2-6541338eb31a
-[duck]: https://github.com/user-attachments/assets/7d821a41-1637-481a-9102-82a027d8b948
-[video]: https://github.com/user-attachments/assets/e6b5ea80-2d6d-461d-a3d3-8cac555de865
-
 [brush]: ./demos/brush.py
 [duck]: ./demos/asset_types.py
 [video]: ./demos/asset_types.py
