@@ -17,7 +17,7 @@ XR Python toolkit for humans and AI agents. Check the demos to get started.
 ## Built with XARP — CMPSC 291I
 | | |
 |:---:|:---:|
-| <img src="https://github.com/user-attachments/assets/dab32046-612f-4b27-971c-98d5a1227cbc" width="300"/> | <img src="https://github.com/user-attachments/assets/841d0ecc-7450-4f9d-8305-61e7630cfd7a" width="300"/> |
+| <img src="https://github.com/user-attachments/assets/dab32046-612f-4b27-971c-98d5a1227cbc" width="300"/> | <img src="https://github.com/user-attachments/assets/af79b1a7-6d91-4211-8218-5e9fadf833f5" width="300"/> |
 | Team 1 | Team 2 |
 | <img src="https://github.com/user-attachments/assets/13cd252e-c971-46b0-b0e5-086645171880" width="300"/> | <img src="https://github.com/user-attachments/assets/841d0ecc-7450-4f9d-8305-61e7630cfd7a" width="300"/> |
 | Team 6 | Team 8 |
