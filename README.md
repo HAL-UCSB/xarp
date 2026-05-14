@@ -1,7 +1,7 @@
 # XARP
 XR Python toolkit for humans and AI agents. Check the demos to get started.
 
-# Demos
+## Demos
 [brush]: ./demos/brush.py
 [duck]: ./demos/asset_types.py
 [video]: ./demos/asset_types.py
@@ -14,8 +14,7 @@ XR Python toolkit for humans and AI agents. Check the demos to get started.
 | [<img src="https://github.com/user-attachments/assets/e6b5ea80-2d6d-461d-a3d3-8cac555de865" width="300"/>][video] | [<img src="https://github.com/user-attachments/assets/d89ebd3d-8b2f-4dc5-8b2d-ddcf57f2a3d1" width="300"/>][video-feed] |
 | video player | video feed |
 
-## CMPSC 291I Student Demos
-> Built with XARP
+## Built with XARP — CMPSC 291I
 | | |
 |:---:|:---:|
 | <img src="https://github.com/user-attachments/assets/dab32046-612f-4b27-971c-98d5a1227cbc" width="300"/> | <img src="https://github.com/user-attachments/assets/af79b1a7-6d91-4211-8218-5e9fadf833f5" width="300"/> |
