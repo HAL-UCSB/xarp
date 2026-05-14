@@ -31,4 +31,4 @@ def rgb_video(xr: SyncXR, *args, **kwargs):
 
 if __name__ == '__main__':
     make_qrcode_image()
-    run(rgb_video)
+    run(depth_video)
