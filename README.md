@@ -1,6 +1,7 @@
 # XARP
 XR Python toolkit for humans and AI agents. Check the demos to get started.
 
+# DEMOS
 [brush]: ./demos/brush.py
 [duck]: ./demos/asset_types.py
 [video]: ./demos/asset_types.py
