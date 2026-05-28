@@ -9,6 +9,7 @@ class WriteCommand(Command):
     cmd: Literal["write"] = Field(default="write", frozen=True)
     text: str
     title: str | None = None
+    hide_after_seconds: int = 5
 
 
 class SayCommand(Command):

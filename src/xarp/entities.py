@@ -1,39 +1,41 @@
 import base64
 import mimetypes
-from enum import Enum
 from io import BytesIO
-from typing import Any, Literal, ClassVar, TypeVar, Generic, Self, Annotated
+from typing import Any, Literal, ClassVar, TypeVar, Generic, Self
 
 import trimesh
 from PIL import Image
-from pydantic import BaseModel, model_validator, SkipValidation
+from pydantic import BaseModel, SkipValidation
 from pydantic import ConfigDict, model_serializer, Field
 from trimesh import Trimesh
+
 from xarp.spatial import Transform
 
 T = TypeVar("T")
 
 
-class MIMEType(str, Enum):
-    TXT = mimetypes.types_map[".txt"]
-    PNG = mimetypes.types_map[".png"]
-    JPEG = mimetypes.types_map[".jpg"]
-    MP3 = mimetypes.types_map[".mp3"]
-    WAV = mimetypes.types_map[".wav"]
+class MIMEType:
+    TXT = "text/plain"
+    PNG = "image/png"
+    JPEG = "image/jpeg"
+    MP3 = "audio/mpeg"
+    WAV = "audio/wav"
     OGG = "audio/ogg"
-    MP4 = mimetypes.types_map[".mp4"]
+    MP4 = "video/mp4"
     GLB = "model/gltf-binary"
     XARP_DEFAULT = "application/vnd.xarp.default"
 
     @staticmethod
-    def from_extension(ext: str) -> "MIMEType":
+    def from_extension(ext: str) -> str:
         ext = ext if ext.startswith(".") else "." + ext
         fallback = {
-            ".ogg": MIMEType.OGG.value,
-            ".glb": MIMEType.GLB.value,
+            ".ogg": MIMEType.OGG,
+            ".glb": MIMEType.GLB,
         }
         mime = mimetypes.types_map.get(ext) or fallback.get(ext)
-        return MIMEType(mime)
+        if mime is None:
+            raise ValueError(f"No MIME type found for extension: {ext}")
+        return mime
 
 
 class Asset(BaseModel, Generic[T]):
@@ -50,19 +52,18 @@ class Asset(BaseModel, Generic[T]):
         arbitrary_types_allowed=True,
         extra="forbid",
         strict=True,
-        use_enum_values=True,
         validate_assignment=True,
     )
 
     asset_key: str | None = None
-    mime_type: MIMEType | None = None
+    mime_type: str | None = None
     raw: bytes | None = None
 
     @property
     def obj(self) -> T:
-        """Deserialise `raw` to the ergonomic Python type. Not cached — call sparingly."""
+        """Deserialize `raw` to the ergonomic Python type. Not cached."""
         if self.raw is None:
-            raise RuntimeError("Asset has no raw data to deserialise")
+            raise RuntimeError("Asset has no raw data to deserialize")
         return self._raw_to_obj(self.raw)
 
     def _obj_to_raw(self, obj: T) -> bytes:
@@ -80,7 +81,7 @@ class Asset(BaseModel, Generic[T]):
         )
 
     @classmethod
-    def from_obj(cls, obj: T, mime_type: MIMEType = None, asset_key: str = None) -> Self:
+    def from_obj(cls, obj: T, mime_type: str | None = None, asset_key: str | None = None) -> Self:
         """Construct from a Python object, encoding to raw immediately."""
         # Instantiate minimally to get access to _obj_to_raw on the correct subclass,
         # then reconstruct with raw populated so serialisation is always safe.
@@ -123,7 +124,7 @@ class DefaultAssets:
 
 
 class ImageAsset(Asset[Image.Image]):
-    mime_type: Literal[MIMEType.PNG, MIMEType.JPEG] = Field(default=MIMEType.PNG, frozen=True)
+    mime_type: Literal["image/png", "image/jpeg"] = Field(default=MIMEType.PNG, frozen=True)
 
     def to_base64(self) -> str:
         return base64.b64encode(self.raw).decode()
@@ -138,7 +139,7 @@ class ImageAsset(Asset[Image.Image]):
 
 
 class TextAsset(Asset[str]):
-    mime_type: Literal[MIMEType.TXT] = Field(default=MIMEType.TXT, frozen=True)
+    mime_type: Literal["text/plain"] = Field(default=MIMEType.TXT, frozen=True)
 
     _encoding: ClassVar[Literal["utf-8"]] = "utf-8"
 
@@ -149,12 +150,12 @@ class TextAsset(Asset[str]):
         return raw.decode(self._encoding)
 
     @classmethod
-    def from_obj(cls, obj: str, mime_type: MIMEType = MIMEType.TXT, asset_key: str = None) -> Self:
+    def from_obj(cls, obj: str, mime_type: str = MIMEType.TXT, asset_key: str | None = None) -> Self:
         return super().from_obj(obj, mime_type, asset_key)
 
 
 class GLBAsset(Asset[Trimesh]):
-    mime_type: Literal[MIMEType.GLB] = Field(default=MIMEType.GLB, frozen=True)
+    mime_type: Literal["model/gltf-binary"] = Field(default=MIMEType.GLB, frozen=True)
 
     _file_type: ClassVar[Literal["glb"]] = "glb"
 
@@ -179,6 +180,7 @@ class Element(BaseModel):
     transform: Transform = Field(default_factory=Transform)
     color: tuple[float, float, float, float] | None = None  # RGBA, components in [0, 1]
     asset: SkipValidation[Asset[Any]] | None = None
+    parent: str | None = None
 
     play: bool | None = None
     time: float | None = None
