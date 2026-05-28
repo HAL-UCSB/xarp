@@ -5,6 +5,7 @@ import socket
 import threading
 import time
 import types
+from collections.abc import Iterable
 from io import BytesIO
 from threading import Thread
 from typing import Any, Iterator, AsyncGenerator
@@ -13,6 +14,7 @@ import PIL.Image
 import httpx
 import uvicorn
 from fastapi import FastAPI, HTTPException, Response
+
 from xarp.commands import Bundle, ResponseMode
 from xarp.commands.entities import (
     ListAssetsCommand,
@@ -36,6 +38,16 @@ from xarp.data_models import DeviceInfo, Hands
 from xarp.entities import ImageAsset, Asset, Element, GLBAsset, TextAsset, DefaultAssets
 from xarp.remote import RemoteXRClient
 from xarp.spatial import Pose, Transform, Vector3, Quaternion
+
+
+def _coerce_elements(element: Element | Iterable[Element]) -> list[Element]:
+    if isinstance(element, Element):
+        return [element]
+
+    elements = list(element)
+    if not elements:
+        raise ValueError("update requires at least one element")
+    return elements
 
 
 class AsyncXR:
@@ -63,17 +75,18 @@ class AsyncXR:
 
     # ---- UI ----
 
-    async def write(self, text: str, title: str | None = None) -> None:
+    async def write(self, text: str, title: str | None = None, hide_after_seconds: int = 5) -> None:
         """Displays a text message.
 
         Args:
             text: Message content to display.
             title: Optional title displayed alongside the message.
+            hide_after_seconds: Hide the panel after this many seconds.
 
         Returns:
             None.
         """
-        await self._execute_none(WriteCommand(text=text, title=title))
+        await self._execute_none(WriteCommand(text=text, title=title, hide_after_seconds=hide_after_seconds))
 
     async def say(self, text: str) -> None:
         """Plays synthesized speech for a text. Resolves when speech playback completes.
@@ -256,16 +269,20 @@ class AsyncXR:
         """
         await self._execute_single(DestroyAssetCommand(asset_key=asset_key, all_assets=all_assets))
 
-    async def update(self, element: Element) -> None:
-        """Creates or updates (upsert) a remote element.
+    async def update(self, element: Element | Iterable[Element]) -> None:
+        """Creates or updates (upsert) one or more remote elements.
 
         Args:
-            element: Element holding the desired state of the virtual entity on the client.
+            element: Element or iterable of Elements holding the desired state of
+                virtual entities on the client. Use ``xr.update(element)`` for a
+                single element or ``xr.update([button, icon])`` for a batch.
 
         Returns:
             None.
         """
-        await self._execute_single(CreateOrUpdateElementCommand(elements=[element]))
+        await self._execute_single(
+            CreateOrUpdateElementCommand(elements=_coerce_elements(element))
+        )
 
     async def list_elements(self) -> list[str]:
         """Lists existing elements, both active and inactive.
@@ -338,8 +355,8 @@ class SyncXR(AsyncXR):
         return self._sync(super().info())
 
     # ---- UI ----
-    def write(self, text: str, title: str | None = None) -> None:
-        return self._sync(super().write(text=text, title=title))
+    def write(self, text: str, title: str | None = None, hide_after_seconds: int = 5) -> None:
+        return self._sync(super().write(text=text, title=title, hide_after_seconds=hide_after_seconds))
 
     def say(self, text: str) -> None:
         return self._sync(super().say(text=text))
@@ -404,7 +421,7 @@ class SyncXR(AsyncXR):
     def destroy_asset(self, asset_key: str | None = None, all_assets: bool = False) -> None:
         return self._sync(super().destroy_asset(asset_key=asset_key, all_assets=all_assets))
 
-    def update(self, element: Element) -> None:
+    def update(self, element: Element | Iterable[Element]) -> None:
         return self._sync(super().update(element))
 
     def list_elements(self) -> list[str]:

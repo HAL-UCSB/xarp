@@ -1,5 +1,7 @@
+import io
 from typing import ClassVar, Literal
 
+import PIL.Image
 from PIL import Image as PIL_Image
 from pydantic import Field
 
@@ -11,14 +13,17 @@ from . import Command, Response
 
 class ImageCommand(Command):
     cmd: Literal["image"] = Field(default="image", frozen=True)
-    pil_img_mode: ClassVar[str] = "RGBA"
 
     @classmethod
     def validate_response_value(cls, value: Response) -> ImageAsset:
-        pixels = value["pixels"]
-        size = value["width"], value["height"]
-        pil_image = PIL_Image.frombytes(cls.pil_img_mode, size, pixels).transpose(PIL_Image.Transpose.FLIP_TOP_BOTTOM)
-        return ImageAsset.from_obj(pil_image)
+        raw = value["raw"]
+        pil_image = PIL_Image.open(io.BytesIO(raw))
+        asset = ImageAsset(
+            mime_type=value["mime_type"],
+            asset_key=None,
+            raw=raw)
+        asset._obj = pil_image
+        return asset
 
 
 class VirtualImageCommand(ImageCommand):
@@ -28,6 +33,17 @@ class VirtualImageCommand(ImageCommand):
 class DepthCommand(ImageCommand):
     cmd: Literal["depth"] = Field(default="depth", frozen=True)
     pil_img_mode: ClassVar[str] = "I;16"
+
+    def validate_response_value(cls, value: Response) -> ImageAsset:
+        raw = value["raw"]
+        size = value["width"], value["height"]
+        pil_image = PIL_Image.frombytes(cls.pil_img_mode, size, raw)
+        asset = ImageAsset(
+            mime_type=value["mime_type"],
+            asset_key=None,
+            raw=raw)
+        asset._obj = pil_image
+        return asset
 
 
 class EyeCommand(Command):

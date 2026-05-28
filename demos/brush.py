@@ -28,7 +28,6 @@ paint = Element(
 def app(xr: SyncXR, *args, **kwargs) -> None:
     xr.say("Brush XR")
     i = 0
-
     stream = xr.sense(hands=True)
     for frame in stream:
         hands: Hands = frame['hands']

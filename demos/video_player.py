@@ -29,7 +29,7 @@ def app(xr: SyncXR, kwargs: dict[str, Any]) -> None:
         asset=video_asset,
         play=True,
         transform=Transform(
-            position=Vector3.forward(),
+            position=Vector3.forward() + Vector3.up(),
         )
     )
     xr.update(video)
