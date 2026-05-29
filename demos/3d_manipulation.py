@@ -21,7 +21,7 @@ def double_hand_element_manipulation(
         xr: SyncXR,
         element: Element,
         stream: AsyncGeneratorIterator,
-        gesture=pinch,
+        gesture=fist,
         anchor_joint=PALM,
         freeze_position: bool = False,
         freeze_rotation: bool = False,
@@ -119,7 +119,7 @@ def app(xr: SyncXR, *args, **kwargs) -> None:
 
     stream = xr.sense(hands=True)
     while True:
-        double_hand_element_manipulation(xr, duck, stream, gesture=fist, freeze_scale=True)
+        double_hand_element_manipulation(xr, duck, stream)
 
 
 if __name__ == '__main__':
