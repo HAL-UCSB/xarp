@@ -1,3 +1,4 @@
+from xarp import colors
 from xarp.data_models import Hands
 from xarp.entities import Element, DefaultAssets
 from xarp.express import SyncXR
@@ -5,24 +6,19 @@ from xarp.gestures import pinch, THUMB_TIP
 from xarp.server import run, make_qrcode_image
 from xarp.spatial import Transform, Vector3
 
-gray = (.5, .5, .5, 1)
-red = (1, 0, 0, .5)
-green = (0, 1, 0, .5)
-blue = (0, 0, 1, .5)
-
 cursor_scale = Transform(scale=Vector3.one() * .02)
 
 brush = Element(
     key="brush",
     asset=DefaultAssets.sphere(),
     transform=cursor_scale,
-    color=gray)
+    color=colors.GRAY)
 
 paint = Element(
     key="paint",
     asset=DefaultAssets.sphere(),
     transform=cursor_scale,
-    color=green)
+    color=colors.GREEN)
 
 
 def app(xr: SyncXR, *args, **kwargs) -> None:

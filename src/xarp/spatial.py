@@ -265,6 +265,37 @@ class Vector3(RootModel[list[float]]):
         cos_theta = float(np.clip(self.dot(other) / denom, -1.0, 1.0))
         return math.acos(cos_theta)
 
+    def aligning_quaternion(self, b: Self, reverse: bool = False) -> "Quaternion":
+        """Return the shortest-arc quaternion that rotates self onto b.
+
+        Args:
+            b: The target vector.
+            reverse: If True, rotate in the opposite direction (b onto self).
+        """
+        an = self.normalized().to_numpy()
+        bn = b.normalized().to_numpy()
+        dot = float(np.dot(an, bn))
+
+        if dot >= 1.0:
+            return Quaternion.identity()
+
+        # Antiparallel: pick an arbitrary perpendicular axis for the 180-degree rotation.
+        # The epsilon guard is widened slightly to avoid a near-zero cross product below.
+        if dot <= -1.0 + 1e-9:
+            perp = np.cross(an, np.array([1.0, 0.0, 0.0]))
+            if np.linalg.norm(perp) < 1e-6:
+                perp = np.cross(an, np.array([0.0, 1.0, 0.0]))
+            perp /= np.linalg.norm(perp)
+            if reverse:
+                perp = -perp
+            return Quaternion.from_xyzw(*perp, 0.0).normalized()
+
+        axis = np.cross(an, bn)
+        if reverse:
+            axis = -axis
+        w = 1.0 + dot
+        return Quaternion.from_xyzw(*axis, w).normalized()
+
 
 class Vector4(RootModel[list[float]]):
     """
