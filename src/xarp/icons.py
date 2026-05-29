@@ -5,6 +5,7 @@ import requests
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from xarp.entities import ImageAsset
+from xarp.spatial import Vector4
 
 MATERIAL_SYMBOLS_CODEPOINTS_URL = (
     "https://raw.githubusercontent.com/google/material-design-icons/master/"
@@ -34,12 +35,18 @@ def _material_symbol_font_bytes() -> bytes:
     return response.content
 
 
-def _normalize_rgba(color: tuple[float, ...] | str) -> tuple[int, int, int, int] | str:
+def _normalize_rgba(color: Vector4 | tuple[float, ...] | list[float] | str) -> tuple[int, int, int, int] | str:
     if isinstance(color, str):
         return color
 
-    r, g, b = color[:3]
-    a = color[3] if len(color) == 4 else 1.0
+    components = color.to_tuple() if isinstance(color, Vector4) else tuple(color)
+    if len(components) not in (3, 4):
+        raise ValueError(f"Expected 3 or 4 color components, got {len(components)}")
+    if any(component < 0.0 or component > 1.0 for component in components):
+        raise ValueError("Color components must be in [0, 1]")
+
+    r, g, b = components[:3]
+    a = components[3] if len(components) == 4 else 1.0
     return (
         int(r * 255),
         int(g * 255),
@@ -51,7 +58,7 @@ def _normalize_rgba(color: tuple[float, ...] | str) -> tuple[int, int, int, int]
 def material_symbol_image(
     name: str,
     size: int = 64,
-    color: tuple[float, ...] | str = (0, 0, 0, 0.54),
+    color: Vector4 | tuple[float, ...] | list[float] | str = (0, 0, 0, 0.54),
     mirrored: bool = True,
 ) -> Image.Image:
     codepoints = _material_symbol_codepoints()
@@ -80,7 +87,7 @@ def material_symbol_image(
 def material_symbol_asset(
     name: str,
     size: int = 64,
-    color: tuple[float, ...] | str = (0, 0, 0, 0.54),
+    color: Vector4 | tuple[float, ...] | list[float] | str = (0, 0, 0, 0.54),
     mirrored: bool = True,
     asset_key: str | None = None,
 ) -> ImageAsset:

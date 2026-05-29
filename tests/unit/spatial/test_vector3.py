@@ -4,7 +4,7 @@ import unittest
 import numpy as np
 from pydantic import ValidationError
 
-from xarp.spatial import Vector3
+from xarp.spatial import Quaternion, Vector3
 
 
 # -----------------------------------------------------------------------
@@ -544,6 +544,40 @@ class TestAngle(unittest.TestCase):
             Vector3(x=1.0, y=0.0, z=0.0).angle(Vector3(x=1.0, y=1.0, z=0.0)),
             math.pi / 4,
         )
+
+
+# -----------------------------------------------------------------------
+# Aligning Quaternion
+# -----------------------------------------------------------------------
+
+class TestAligningQuaternion(unittest.TestCase):
+    def test_aligning_quaternion_rotates_source_to_target(self):
+        source = Vector3(2.0, 0.0, 0.0)
+        target = Vector3(0.0, 3.0, 0.0)
+
+        q = source.aligning_quaternion(target)
+
+        self.assertIsInstance(q, Quaternion)
+        self.assertAlmostEqual(q.norm(), 1.0, delta=1e-12)
+        assert_vec_close(self, q.rotate_vector(source.normalized()), target.normalized())
+
+    def test_aligning_quaternion_reverse_rotates_target_to_source(self):
+        source = Vector3.right()
+        target = Vector3.up()
+
+        q = source.aligning_quaternion(target, reverse=True)
+
+        assert_vec_close(self, q.rotate_vector(target), source)
+
+    def test_aligning_quaternion_rotates_antiparallel_vectors(self):
+        source = Vector3.right()
+        target = Vector3.left()
+
+        q = source.aligning_quaternion(target)
+
+        self.assertAlmostEqual(q.norm(), 1.0, delta=1e-12)
+        self.assertAlmostEqual(q.w, 0.0, delta=1e-9)
+        assert_vec_close(self, q.rotate_vector(source), target)
 
 
 if __name__ == "__main__":

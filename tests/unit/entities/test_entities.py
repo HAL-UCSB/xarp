@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 from PIL import Image
 from pydantic import ValidationError
 
+from xarp.colors import RED
 from xarp.entities import (
     Asset,
     DefaultAssets,
@@ -15,7 +16,7 @@ from xarp.entities import (
     MIMEType,
     TextAsset,
 )
-from xarp.spatial import Transform
+from xarp.spatial import Transform, Vector4
 
 
 # ---------------------------------------------------------------------------
@@ -347,7 +348,19 @@ class TestElement(unittest.TestCase):
 
     def test_color_rgba_accepted(self):
         e = Element(color=(1.0, 0.5, 0.0, 1.0))
-        self.assertEqual(e.color, (1.0, 0.5, 0.0, 1.0))
+        self.assertEqual(e.color, Vector4(1.0, 0.5, 0.0, 1.0))
+
+    def test_color_constant_accepted(self):
+        e = Element(color=RED)
+        self.assertEqual(e.color, RED)
+        self.assertEqual(e.model_dump()["color"], [1.0, 0.0, 0.0, 1.0])
+
+    def test_color_out_of_range_rejected(self):
+        with self.assertRaises(ValidationError):
+            Element(color=(255.0, 0.0, 0.0, 1.0))
+
+        with self.assertRaises(ValidationError):
+            Element(color=(-0.1, 0.0, 0.0, 1.0))
 
     def test_transform_is_independent_per_instance(self):
         e1 = Element()
