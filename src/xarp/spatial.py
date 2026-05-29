@@ -64,6 +64,10 @@ class Vector3(RootModel[list[float]]):
     # ------------------------------------------------------------------
 
     @classmethod
+    def from_xyz(cls, x: float, y: float, z: float) -> Self:
+        return cls(float(x), float(y), float(z))
+
+    @classmethod
     def from_sequence(cls, seq: list[float] | tuple[float, ...] | np.ndarray) -> Self:
         if len(seq) != 3:
             raise ValueError(f"Expected 3 components, got {len(seq)}")
@@ -260,6 +264,208 @@ class Vector3(RootModel[list[float]]):
             raise ValueError("Cannot compute angle involving a zero vector")
         cos_theta = float(np.clip(self.dot(other) / denom, -1.0, 1.0))
         return math.acos(cos_theta)
+
+
+class Vector4(RootModel[list[float]]):
+    """
+    Immutable 4D vector with float64 components.
+
+    Serializes as a plain array: [x, y, z, w]
+    """
+
+    model_config = {"frozen": True}
+
+    __slots__ = ("_arr",)
+
+    # ------------------------------------------------------------------
+    # Construction
+    # ------------------------------------------------------------------
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        if args and not kwargs:
+            if len(args) == 4:
+                super().__init__(root=[float(args[0]), float(args[1]), float(args[2]), float(args[3])])
+            elif len(args) == 1:
+                seq = args[0]
+                if hasattr(seq, "__len__") and len(seq) != 4:
+                    raise ValueError(f"Expected 4 components, got {len(seq)}")
+                super().__init__(root=[float(seq[0]), float(seq[1]), float(seq[2]), float(seq[3])])
+            else:
+                raise ValueError(f"Expected 1 or 4 positional arguments, got {len(args)}")
+        elif {"x", "y", "z", "w"} <= kwargs.keys():
+            super().__init__(root=[float(kwargs["x"]), float(kwargs["y"]), float(kwargs["z"]), float(kwargs["w"])])
+        else:
+            super().__init__(**kwargs)
+
+    def model_post_init(self, __context: Any) -> None:
+        object.__setattr__(self, "_arr", np.array(self.root, dtype=np.float64))
+
+    # ------------------------------------------------------------------
+    # Named component accessors
+    # ------------------------------------------------------------------
+
+    @property
+    def x(self) -> float:
+        return self.root[0]
+
+    @property
+    def y(self) -> float:
+        return self.root[1]
+
+    @property
+    def z(self) -> float:
+        return self.root[2]
+
+    @property
+    def w(self) -> float:
+        return self.root[3]
+
+    # ------------------------------------------------------------------
+    # Factories
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def from_xyzw(cls, x: float, y: float, z: float, w: float) -> Self:
+        return cls(float(x), float(y), float(z), float(w))
+
+    @classmethod
+    def from_sequence(cls, seq: list[float] | tuple[float, ...] | np.ndarray) -> Self:
+        if len(seq) != 4:
+            raise ValueError(f"Expected 4 components, got {len(seq)}")
+        return cls(float(seq[0]), float(seq[1]), float(seq[2]), float(seq[3]))
+
+    # ------------------------------------------------------------------
+    # Constants
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def zero(cls) -> Self:
+        return cls(0.0, 0.0, 0.0, 0.0)
+
+    @classmethod
+    def one(cls) -> Self:
+        return cls(1.0, 1.0, 1.0, 1.0)
+
+    # ------------------------------------------------------------------
+    # Conversion
+    # ------------------------------------------------------------------
+
+    def to_numpy(self) -> np.ndarray:
+        return self._arr.copy()
+
+    def to_list(self) -> list[float]:
+        return list(self.root)
+
+    def to_tuple(self) -> tuple[float, float, float, float]:
+        return (self.root[0], self.root[1], self.root[2], self.root[3])
+
+    # ------------------------------------------------------------------
+    # Sequence protocol
+    # ------------------------------------------------------------------
+
+    def __len__(self) -> int:
+        return 4
+
+    def __iter__(self) -> Iterator[float]:  # type: ignore[override]
+        yield self.root[0]
+        yield self.root[1]
+        yield self.root[2]
+        yield self.root[3]
+
+    def __getitem__(self, index: int) -> float:
+        return float(self._arr[index])
+
+    # ------------------------------------------------------------------
+    # Arithmetic
+    # ------------------------------------------------------------------
+
+    def __add__(self, other: object) -> Self:
+        if not isinstance(other, Vector4):
+            return NotImplemented
+        return Vector4.from_sequence(self._arr + other._arr)
+
+    def __sub__(self, other: object) -> Self:
+        if not isinstance(other, Vector4):
+            return NotImplemented
+        return Vector4.from_sequence(self._arr - other._arr)
+
+    def __radd__(self, other: object) -> Self:
+        return self.__add__(other)
+
+    def __rsub__(self, other: object) -> Self:
+        if not isinstance(other, Vector4):
+            return NotImplemented
+        return Vector4.from_sequence(other._arr - self._arr)
+
+    def __mul__(self, scalar: float) -> Self:
+        if not isinstance(scalar, (int, float)):
+            return NotImplemented
+        return Vector4.from_sequence(self._arr * float(scalar))
+
+    def __rmul__(self, scalar: float) -> Self:
+        return self.__mul__(scalar)
+
+    def __truediv__(self, scalar: float) -> Self:
+        if not isinstance(scalar, (int, float)):
+            return NotImplemented
+        if scalar == 0.0:
+            raise ZeroDivisionError("Cannot divide vector by zero")
+        return Vector4.from_sequence(self._arr / float(scalar))
+
+    def __neg__(self) -> Self:
+        return Vector4.from_sequence(-self._arr)
+
+    def __abs__(self) -> float:
+        return self.norm()
+
+    # ------------------------------------------------------------------
+    # Comparison
+    # ------------------------------------------------------------------
+
+    def isclose(self, other: Self, atol: float = 1e-9) -> bool:
+        """Approximate equality with an absolute tolerance."""
+        return bool(np.allclose(self._arr, other._arr, atol=atol, rtol=0.0))
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Vector4):
+            return NotImplemented
+        return bool(np.array_equal(self._arr, other._arr))
+
+    def __hash__(self) -> int:
+        return hash(self._arr.tobytes())
+
+    # ------------------------------------------------------------------
+    # Representation
+    # ------------------------------------------------------------------
+
+    def __repr__(self) -> str:
+        return f"Vector4({self.x:.6g}, {self.y:.6g}, {self.z:.6g}, {self.w:.6g})"
+
+    # ------------------------------------------------------------------
+    # Vector math
+    # ------------------------------------------------------------------
+
+    def norm(self) -> float:
+        return float(np.linalg.norm(self._arr))
+
+    def norm_squared(self) -> float:
+        return float(np.dot(self._arr, self._arr))
+
+    def normalized(self, epsilon: float = 1e-12) -> Self:
+        n = self.norm()
+        if n < epsilon:
+            raise ValueError("Cannot normalize a zero (or near-zero) vector")
+        return Vector4.from_sequence(self._arr / n)
+
+    def dot(self, other: Self) -> float:
+        return float(np.dot(self._arr, other._arr))
+
+    def distance(self, other: Self) -> float:
+        return (self - other).norm()
+
+    def lerp(self, other: Self, t: float) -> Self:
+        """Linear interpolation. t=0 -> self, t=1 -> other."""
+        return Vector4.from_sequence(self._arr + (other._arr - self._arr) * t)
 
 
 class Quaternion(RootModel[list[float]]):

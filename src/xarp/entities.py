@@ -6,10 +6,10 @@ from typing import Any, Literal, ClassVar, TypeVar, Generic, Self
 import trimesh
 from PIL import Image
 from pydantic import BaseModel, SkipValidation
-from pydantic import ConfigDict, model_serializer, Field
+from pydantic import ConfigDict, model_serializer, Field, field_validator
 from trimesh import Trimesh
 
-from xarp.spatial import Transform
+from xarp.spatial import Transform, Vector4
 
 T = TypeVar("T")
 
@@ -178,12 +178,26 @@ class Element(BaseModel):
     key: str = ""
     active: bool = True
     transform: Transform = Field(default_factory=Transform)
-    color: tuple[float, float, float, float] | None = None  # RGBA, components in [0, 1]
+    color: Vector4 | None = None
     asset: SkipValidation[Asset[Any]] | None = None
     parent: str | None = None
 
     play: bool | None = None
     time: float | None = None
+
+    @field_validator("color", mode="before")
+    @classmethod
+    def _coerce_color(cls, value: Any) -> Vector4 | None:
+        if value is None or isinstance(value, Vector4):
+            return value
+        return Vector4(value)
+
+    @field_validator("color")
+    @classmethod
+    def _validate_color_range(cls, value: Vector4 | None) -> Vector4 | None:
+        if value is not None and any(component < 0.0 or component > 1.0 for component in value):
+            raise ValueError("Color components must be in [0, 1]")
+        return value
 
     # @model_validator(mode="after")
     # def validate_asset_not_empty(self) -> "Element":

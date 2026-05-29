@@ -3,6 +3,7 @@ from unittest.mock import Mock, patch
 
 from PIL import Image, ImageFont
 
+from xarp.colors import WHITE
 from xarp.entities import ImageAsset
 from xarp.icons import (
     _material_symbol_codepoints,
@@ -64,6 +65,14 @@ class TestMaterialSymbols(unittest.TestCase):
             (63, 127, 255, 191),
         )
         self.assertEqual(_normalize_rgba((1.0, 0.0, 0.5)), (255, 0, 127, 255))
+        self.assertEqual(_normalize_rgba(WHITE), (255, 255, 255, 255))
+
+    def test_numeric_colors_must_be_normalized(self):
+        with self.assertRaises(ValueError):
+            _normalize_rgba((255.0, 255.0, 255.0, 1.0))
+
+        with self.assertRaises(ValueError):
+            _normalize_rgba((-0.1, 0.0, 0.0, 1.0))
 
     def test_returns_rgba_image_with_requested_size(self):
         responses = [
@@ -76,6 +85,22 @@ class TestMaterialSymbols(unittest.TestCase):
             patch("xarp.icons.ImageFont.truetype", return_value=self.default_font),
         ):
             image = material_symbol_image("home", size=48)
+
+        self.assertIsInstance(image, Image.Image)
+        self.assertEqual(image.mode, "RGBA")
+        self.assertEqual(image.size, (48, 48))
+
+    def test_vector4_color_returns_rgba_image(self):
+        responses = [
+            self._mock_response(text="home e88a\n"),
+            self._mock_response(content=b"font-bytes"),
+        ]
+
+        with (
+            patch("xarp.icons.requests.get", side_effect=responses),
+            patch("xarp.icons.ImageFont.truetype", return_value=self.default_font),
+        ):
+            image = material_symbol_image("home", size=48, color=WHITE)
 
         self.assertIsInstance(image, Image.Image)
         self.assertEqual(image.mode, "RGBA")
