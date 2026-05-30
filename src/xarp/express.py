@@ -8,7 +8,7 @@ import types
 from collections.abc import Iterable
 from io import BytesIO
 from threading import Thread
-from typing import Any, Iterator, AsyncGenerator
+from typing import Any, Iterator, AsyncGenerator, TypeAlias, TypeVar
 
 import PIL.Image
 import httpx
@@ -39,15 +39,21 @@ from xarp.entities import ImageAsset, Asset, Element, GLBAsset, TextAsset, Defau
 from xarp.remote import RemoteXRClient
 from xarp.spatial import Pose, Transform, Vector3, Quaternion
 
+ElementBatch: TypeAlias = Element | Iterable[Element]
+AssetKeyBatch: TypeAlias = str | Iterable[str]
+T = TypeVar("T")
 
-def _coerce_elements(element: Element | Iterable[Element]) -> list[Element]:
-    if isinstance(element, Element):
-        return [element]
 
-    elements = list(element)
-    if not elements:
-        raise ValueError("update requires at least one element")
-    return elements
+def _ensure_iterable(item_or_iterable: T | Iterable[T], item_type: type[T]) -> list[T]:
+    """Returns a non-empty list for APIs that accept one item or a batch."""
+    if item_or_iterable is None:
+        return None
+    if isinstance(item_or_iterable, item_type):
+        return [item_or_iterable]
+    items = list(item_or_iterable)
+    if not items:
+        raise ValueError(f"{item_type.__name__} batch requires at least one item")
+    return items
 
 
 class AsyncXR:
@@ -257,19 +263,22 @@ class AsyncXR:
         """
         return await self._execute_single(ListAssetsCommand())
 
-    async def destroy_asset(self, asset_key: str | None = None, all_assets: bool = False) -> None:
-        """Deletes one asset or all assets.
+    async def destroy_asset(self, keys: AssetKeyBatch | None = None, all_assets: bool = False) -> None:
+        """Deletes one asset, a batch of assets, or all assets.
 
         Args:
-            asset_key: Asset key to delete. Ignored if ``all_assets`` is True.
-            all_assets: If True, deletes all stored assets.
+            keys: Asset key string or iterable of asset keys strings to delete. Required
+                unless ``all_assets`` is True.
+            all_assets: If True, deletes all stored assets. Do not provide
+                ``keys`` when this is True.
 
         Returns:
             None.
         """
-        await self._execute_single(DestroyAssetCommand(asset_key=asset_key, all_assets=all_assets))
+        _keys = _ensure_iterable(keys, str)
+        await self._execute_single(DestroyAssetCommand(keys=_keys, all_assets=all_assets))
 
-    async def update(self, element: Element | Iterable[Element]) -> None:
+    async def update(self, element: ElementBatch) -> None:
         """Creates or updates (upsert) one or more remote elements.
 
         Args:
@@ -281,7 +290,7 @@ class AsyncXR:
             None.
         """
         await self._execute_single(
-            CreateOrUpdateElementCommand(elements=_coerce_elements(element))
+            CreateOrUpdateElementCommand(elements=_ensure_iterable(element, Element))
         )
 
     async def list_elements(self) -> list[str]:
@@ -292,19 +301,26 @@ class AsyncXR:
         """
         return await self._execute_single(ListElementsCommand())
 
-    async def destroy_element(self, element: Element | None = None, all_elements: bool = False) -> None:
-        """Destroys one element or all elements.
+    async def destroy_element(self, element: ElementBatch | None = None, all_elements: bool = False) -> None:
+        """Destroys one element, a batch of elements, or all elements.
 
         Args:
-            element: Element to destroy.
-            all_elements: If True, destroys all elements.
+            element: Element or iterable of Elements to destroy. Required unless
+                ``all_elements`` is True.
+            all_elements: If True, destroys all elements. Do not provide
+                ``element`` when this is True.
 
         Returns:
             None.
         """
+        keys = None
+        if element is not None:
+            elements = _ensure_iterable(element, Element)
+            keys = [item.key for item in elements]
+
         await self._execute_single(
             DestroyElementCommand(
-                key=element.key if element is not None else None,
+                keys=keys,
                 all_elements=all_elements,
             )
         )
@@ -418,16 +434,16 @@ class SyncXR(AsyncXR):
     def list_assets(self) -> list[str]:
         return self._sync(super().list_assets())
 
-    def destroy_asset(self, asset_key: str | None = None, all_assets: bool = False) -> None:
-        return self._sync(super().destroy_asset(asset_key=asset_key, all_assets=all_assets))
+    def destroy_asset(self, keys: AssetKeyBatch | None = None, all_assets: bool = False) -> None:
+        return self._sync(super().destroy_asset(keys=keys, all_assets=all_assets))
 
-    def update(self, element: Element | Iterable[Element]) -> None:
+    def update(self, element: ElementBatch) -> None:
         return self._sync(super().update(element))
 
     def list_elements(self) -> list[str]:
         return self._sync(super().list_elements())
 
-    def destroy_element(self, element: Element | None = None, all_elements: bool = False) -> None:
+    def destroy_element(self, element: ElementBatch | None = None, all_elements: bool = False) -> None:
         return self._sync(super().destroy_element(element=element, all_elements=all_elements))
 
 

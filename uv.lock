@@ -2874,6 +2874,7 @@ dependencies = [
     { name = "python-multipart" },
     { name = "qrcode", extra = ["pil"] },
     { name = "requests" },
+    { name = "scipy" },
     { name = "scipy-stubs" },
     { name = "trimesh" },
     { name = "uvicorn" },
@@ -2890,7 +2891,6 @@ agents = [
 dev = [
     { name = "matplotlib" },
     { name = "pandas" },
-    { name = "scipy" },
     { name = "ty" },
 ]
 
@@ -2907,6 +2907,7 @@ requires-dist = [
     { name = "python-multipart", specifier = ">=0.0.21" },
     { name = "qrcode", extras = ["pil"], specifier = ">=8.2" },
     { name = "requests", specifier = ">=2.32.5" },
+    { name = "scipy", specifier = ">=1.17.0" },
     { name = "scipy-stubs", specifier = "~=1.17.0" },
     { name = "smolagents", extras = ["openai", "toolkit"], marker = "extra == 'agents'", specifier = ">=1.24.0" },
     { name = "trimesh", specifier = ">=4.11.0" },
@@ -2919,7 +2920,6 @@ provides-extras = ["agents"]
 dev = [
     { name = "matplotlib", specifier = ">=3.10.8" },
     { name = "pandas", specifier = ">=3.0.0" },
-    { name = "scipy", specifier = ">=1.17.0" },
     { name = "ty", specifier = ">=0.0.8" },
 ]
 
