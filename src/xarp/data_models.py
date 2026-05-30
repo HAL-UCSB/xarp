@@ -1,7 +1,7 @@
-from typing import Tuple
+from typing import Any, Tuple
 
 import numpy as np
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 from .spatial import Pose, Vector3
 
@@ -39,6 +39,15 @@ class CameraIntrinsics(BaseModel):
     principal_point: Tuple[float, float]
     sensor_resolution: Tuple[float, float]
     lens_offset: Vector3 | None = None  # pixel offset in (cx, cy); z ignored
+
+    @field_validator("lens_offset", mode="before")
+    @classmethod
+    def _coerce_lens_offset(cls, value: Any) -> Any:
+        if isinstance(value, Pose):
+            return value.position
+        if isinstance(value, dict) and "position" in value:
+            return value["position"]
+        return value
 
     def _fx_fy_cx_cy(self) -> tuple[float, float, float, float]:
         fx, fy = self.focal_length

@@ -46,18 +46,18 @@ class ListAssetsCommand(Command):
 
 class DestroyAssetCommand(Command):
     cmd: Literal["destroy_asset"] = Field(default="destroy_asset", frozen=True)
-    asset_key: list[str] | str | None = None
+    keys: list[str] | None = None
     all_assets: bool = False
 
     @model_validator(mode="after")
     def validate_asset_key_all(self):
         if self.all_assets:
-            if self.asset_key is not None:
+            if self.keys is not None:
                 raise ValueError('When "all_assets" is True, "asset_key" must not be provided.')
             return self
-        if not self.asset_key:
-            raise ValueError('When "all_assets" is False, "asset_key" must be a non-empty string or list.')
-        if isinstance(self.asset_key, list) and any(not k for k in self.asset_key):
+        if not self.keys:
+            raise ValueError('When "all_assets" is False, "asset_key" must be a non-empty string or list of strings.')
+        if isinstance(self.keys, list) and any(not k for k in self.keys):
             raise ValueError('"asset_key" list must not contain empty strings.')
         return self
 
@@ -71,15 +71,17 @@ class ListElementsCommand(Command):
 
 class DestroyElementCommand(Command):
     cmd: Literal["destroy_element"] = Field(default="destroy_element", frozen=True)
-    key: str | None = None
+    keys: list[str] | None = None
     all_elements: bool = False
 
     @model_validator(mode="after")
     def validate_key_all(self):
         if self.all_elements:
-            if self.key is not None:
-                raise ValueError("When \"all_elements\" is True, \"key\" must not be provided.")
+            if self.keys is not None:
+                raise ValueError("When \"all_elements\" is True, \"keys\" must not be provided.")
             return self
-        if not self.key:
-            raise ValueError("When \"all_elements\" is False, \"key\" must be a non-empty string.")
+        if not self.keys:
+            raise ValueError("When \"all_elements\" is False, \"keys\" must be a non-empty string or list of strings.")
+        if isinstance(self.keys, list) and any(not k for k in self.keys):
+            raise ValueError('"keys" list must not contain empty strings.')
         return self
