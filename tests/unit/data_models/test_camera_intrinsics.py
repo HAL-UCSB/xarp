@@ -194,9 +194,25 @@ class TestWorldPointToPanelPixel(unittest.TestCase):
 
 class TestCameraIntrinsicsValidation(unittest.TestCase):
 
-    def test_pose_as_lens_offset_raises(self):
-        with self.assertRaises(ValidationError):
-            make_intrinsics(lens_offset=Pose.identity())
+    def test_pose_as_lens_offset_uses_position(self):
+        pose = Pose(position=Vector3(10.0, -5.0, 1.0))
+        intr = make_intrinsics(cx=320.0, cy=240.0, lens_offset=pose)
+        _, _, cx, cy = intr._fx_fy_cx_cy()
+        self.assertAlmostEqual(cx, 330.0)
+        self.assertAlmostEqual(cy, 235.0)
+
+    def test_pose_dict_as_lens_offset_uses_position(self):
+        intr = make_intrinsics(
+            cx=320.0,
+            cy=240.0,
+            lens_offset={
+                "position": [10.0, -5.0, 1.0],
+                "rotation": [0.0, 0.0, 0.0, 1.0],
+            },
+        )
+        _, _, cx, cy = intr._fx_fy_cx_cy()
+        self.assertAlmostEqual(cx, 330.0)
+        self.assertAlmostEqual(cy, 235.0)
 
     def test_frozen_mutation_raises(self):
         intr = make_intrinsics()
