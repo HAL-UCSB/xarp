@@ -25,7 +25,7 @@ XARP is a Python toolkit for extended reality. It replaces lengthy build-deploy 
 ## Client Setup
 
 Install the XARP client on your device:
-- [Meta Quest](https://drive.google.com/file/d/1OQzJnSCiFlg8Q5TPFqxdsf0yi572DsCx/view?usp=sharing)
+- [Meta Quest](https://drive.google.com/file/d/1dQWa4Ftz1GPzAHtORd5V0nqjhC1QTMbn)
 - [Android (Coming Soon)](#)
 
 ## Server Setup
