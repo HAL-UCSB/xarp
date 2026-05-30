@@ -57,6 +57,9 @@ def faces_intersecting_world_spheres(
 
 
 def point_triangle_distance_squared(point: np.ndarray, triangles: np.ndarray) -> np.ndarray:
+    def row_dot(x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        return np.einsum("ij,ij->i", x, y)
+
     a = triangles[:, 0]
     b = triangles[:, 1]
     c = triangles[:, 2]
@@ -65,20 +68,20 @@ def point_triangle_distance_squared(point: np.ndarray, triangles: np.ndarray) ->
     ac = c - a
     ap = point - a
 
-    d1 = np.einsum("ij,ij->i", ab, ap)
-    d2 = np.einsum("ij,ij->i", ac, ap)
+    d1 = row_dot(ab, ap)
+    d2 = row_dot(ac, ap)
     result = np.empty(len(triangles), dtype=np.float64)
     remaining = np.ones(len(triangles), dtype=bool)
 
     mask = (d1 <= 0.0) & (d2 <= 0.0)
-    result[mask] = np.einsum("ij,ij->i", ap[mask], ap[mask])
+    result[mask] = row_dot(ap[mask], ap[mask])
     remaining &= ~mask
 
     bp = point - b
-    d3 = np.einsum("ij,ij->i", ab, bp)
-    d4 = np.einsum("ij,ij->i", ac, bp)
+    d3 = row_dot(ab, bp)
+    d4 = row_dot(ac, bp)
     mask = remaining & (d3 >= 0.0) & (d4 <= d3)
-    result[mask] = np.einsum("ij,ij->i", bp[mask], bp[mask])
+    result[mask] = row_dot(bp[mask], bp[mask])
     remaining &= ~mask
 
     vc = d1 * d4 - d3 * d2
@@ -86,14 +89,14 @@ def point_triangle_distance_squared(point: np.ndarray, triangles: np.ndarray) ->
     v = d1[mask] / (d1[mask] - d3[mask])
     closest = a[mask] + ab[mask] * v[:, None]
     delta = point - closest
-    result[mask] = np.einsum("ij,ij->i", delta, delta)
+    result[mask] = row_dot(delta, delta)
     remaining &= ~mask
 
     cp = point - c
-    d5 = np.einsum("ij,ij->i", ab, cp)
-    d6 = np.einsum("ij,ij->i", ac, cp)
+    d5 = row_dot(ab, cp)
+    d6 = row_dot(ac, cp)
     mask = remaining & (d6 >= 0.0) & (d5 <= d6)
-    result[mask] = np.einsum("ij,ij->i", cp[mask], cp[mask])
+    result[mask] = row_dot(cp[mask], cp[mask])
     remaining &= ~mask
 
     vb = d5 * d2 - d1 * d6
@@ -101,7 +104,7 @@ def point_triangle_distance_squared(point: np.ndarray, triangles: np.ndarray) ->
     w = d2[mask] / (d2[mask] - d6[mask])
     closest = a[mask] + ac[mask] * w[:, None]
     delta = point - closest
-    result[mask] = np.einsum("ij,ij->i", delta, delta)
+    result[mask] = row_dot(delta, delta)
     remaining &= ~mask
 
     va = d3 * d6 - d5 * d4
@@ -109,7 +112,7 @@ def point_triangle_distance_squared(point: np.ndarray, triangles: np.ndarray) ->
     w = (d4[mask] - d3[mask]) / ((d4[mask] - d3[mask]) + (d5[mask] - d6[mask]))
     closest = b[mask] + (c[mask] - b[mask]) * w[:, None]
     delta = point - closest
-    result[mask] = np.einsum("ij,ij->i", delta, delta)
+    result[mask] = row_dot(delta, delta)
     remaining &= ~mask
 
     denom = 1.0 / (va[remaining] + vb[remaining] + vc[remaining])
@@ -117,7 +120,7 @@ def point_triangle_distance_squared(point: np.ndarray, triangles: np.ndarray) ->
     w = vc[remaining] * denom
     closest = a[remaining] + ab[remaining] * v[:, None] + ac[remaining] * w[:, None]
     delta = point - closest
-    result[remaining] = np.einsum("ij,ij->i", delta, delta)
+    result[remaining] = row_dot(delta, delta)
     return result
 
 
