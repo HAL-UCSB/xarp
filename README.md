@@ -44,7 +44,7 @@ pip install git+https://github.com/HAL-UCSB/xarp.git --extra agents
 
 ```bibtex
 @article{caetano2025xarp,
-  title={XARP Tools: An Extended Reality Platform for Humans and AI Agents},
+  title={XARP: A Human-First and Agent-Ready Extended Reality Toolkit in Python},
   author={Caetano, Arthur and Kumaran, Radha and Jou, Kelvin and H{\"o}llerer, Tobias and Sra, Misha},
   journal={arXiv preprint arXiv:2508.04108},
   year={2025}
