@@ -23,10 +23,6 @@ XRApp = (
 )
 
 
-# ---------------------------------------------------------------------------
-# Server
-# ---------------------------------------------------------------------------
-
 def run(xr_app: XRApp) -> None:
     """
     Start the XR WebSocket server and block until it shuts down.
@@ -62,11 +58,6 @@ def run(xr_app: XRApp) -> None:
         ws_max_size=100 * 1024 ** 2,  # 100 MB
     )
     log.info("Server shut down normally")
-
-
-# ---------------------------------------------------------------------------
-# QR code helper
-# ---------------------------------------------------------------------------
 
 def make_qrcode_image(
         protocol: str = "ws",

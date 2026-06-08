@@ -631,6 +631,23 @@ if agents_available:
         async def hands(self) -> dict[str, Any]:
             return (await super().hands()).model_dump()
 
+        async def destroy_element(self, keys: list[str] | None = None, all_elements: bool = False) -> None:
+            """Destroys elements by key, or all elements.
+
+            Args:
+                keys: Element key strings to delete. Required unless ``all_elements`` is True.
+                all_elements: If True, deletes all elements. Do not provide ``keys`` when this is True.
+
+            Returns:
+                None.
+            """
+            await self._execute_single(
+                DestroyElementCommand(
+                    keys=keys,
+                    all_elements=all_elements,
+                )
+            )
+
         async def create_or_update_glb(
                 self,
                 key: str,
@@ -815,6 +832,25 @@ if agents_available:
 
         def hands(self) -> dict:
             return super().hands().model_dump()
+
+        def destroy_element(self, keys: list[str] | None = None, all_elements: bool = False) -> None:
+            """Destroys elements by key, or all elements.
+
+            Args:
+                keys: Element key strings to delete. Required unless ``all_elements`` is True.
+                all_elements: If True, deletes all elements. Do not provide ``keys`` when this is True.
+
+            Returns:
+                None.
+            """
+            return self._sync(
+                self._execute_single(
+                    DestroyElementCommand(
+                        keys=keys,
+                        all_elements=all_elements,
+                    )
+                )
+            )
 
         def create_or_update_glb(
                 self,
