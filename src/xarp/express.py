@@ -562,15 +562,9 @@ except ImportError:
 
 if agents_available:
 
-    def _asset_to_mcp_image(asset: ImageAsset, max_width: int = 640) -> MCPImage:
-        """Resize an ImageAsset to at most `max_width` pixels wide and return an MCPImage."""
-        img = asset.obj
-        if img.width > max_width:
-            new_height = int((max_width / img.width) * img.height)
-            img = img.resize((max_width, new_height), PIL.Image.Resampling.LANCZOS)
-        buf = BytesIO()
-        img.save(buf, format="PNG")
-        return MCPImage(data=buf.getvalue(), format="png")
+    def _asset_to_mcp_image(asset: ImageAsset) -> MCPImage:
+        """Return an ImageAsset as MCP-native image content."""
+        return MCPImage(data=asset.raw, format=asset.mime_type.split("/")[-1])
 
 
     def _make_element(
@@ -599,7 +593,7 @@ if agents_available:
             """Captures one RGB image of the physical environment from the user's point of view.
 
             Returns:
-                An Image in PNG format, resized to at most 640px wide.
+                An MCP image using the captured image's native encoded format.
             """
             return _asset_to_mcp_image(await super().image())
 
@@ -607,7 +601,7 @@ if agents_available:
             """Captures one RGBA image of the virtual environment from the user's point of view.
 
             Returns:
-                An Image in PNG format, resized to at most 640px wide.
+                An MCP image using the captured image's native encoded format.
             """
             return _asset_to_mcp_image(await super().virtual_image())
 
@@ -615,7 +609,7 @@ if agents_available:
             """Captures one depth frame of the physical environment.
 
             Returns:
-                An image in PNG format, resized to at most 640px wide.
+                An MCP image using the captured image's native encoded format.
             """
             return _asset_to_mcp_image(await super().depth())
 
