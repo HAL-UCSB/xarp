@@ -1,5 +1,7 @@
 # XARP
 ### Human-First and Agent-Ready XR in Python
+[![Read the Docs](https://img.shields.io/readthedocs/xarp/latest?style=flat-square&logo=readthedocs&logoColor=white)](https://xarp.readthedocs.io/en/latest/api/express.html#xarp.express.SyncXR.info)
+
 XARP is a Python toolkit for extended reality. It replaces lengthy build-deploy cycles with a fast prototype workflow, think [Streamlit](https://streamlit.io) or [Gradio](https://www.gradio.app) for XR. XARP also augments AI agents with XR capabilities at runtime through callable tools and a Model Context Protocol.
 
 ## Demos
