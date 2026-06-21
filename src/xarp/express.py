@@ -1,3 +1,9 @@
+"""High-level asynchronous and blocking interfaces to a remote XR client.
+
+Applications normally receive :class:`AsyncXR` or :class:`SyncXR` from
+:func:`xarp.server.run`; they do not construct these clients directly.
+"""
+
 import asyncio
 import base64
 import secrets
@@ -39,7 +45,9 @@ from xarp.entities import ImageAsset, Asset, Element, GLBAsset, TextAsset, Defau
 from xarp.remote import RemoteXRClient
 from xarp.spatial import Pose, Transform, Vector3, Quaternion
 
+#: One element or an iterable of elements accepted by scene mutation methods.
 ElementBatch: TypeAlias = Element | Iterable[Element]
+#: One asset key or an iterable of asset keys accepted by asset deletion methods.
 AssetKeyBatch: TypeAlias = str | Iterable[str]
 T = TypeVar("T")
 
@@ -57,7 +65,15 @@ def _ensure_iterable(item_or_iterable: T | Iterable[T], item_type: type[T]) -> l
 
 
 class AsyncXR:
-    """Async convenience wrapper around a :class:`~xarp.RemoteXRClient` that exposes common XR operations"""
+    """Asynchronous interface for one connected XR client.
+
+    Use this interface from an asynchronous application passed to
+    :func:`xarp.server.run`. Operations are sent to the client over its active
+    WebSocket session.
+
+    Args:
+        remote: Active transport for the connected XR client.
+    """
 
     def __init__(self, remote: RemoteXRClient):
         self.remote = remote
@@ -190,9 +206,12 @@ class AsyncXR:
             hands: bool = False,
             rt: bool = True,
     ) -> AsyncGenerator[dict[str, Any], None]:
-        """Streams selected sensing modalities continuously. Values are produced
-        by iterating the returned async generator. Cleanup requires an explicit
-        call to ``aclose()`` on the returned async generator.
+        """Stream selected sensing modalities continuously.
+
+        Calling this method returns an async generator. If no modality is
+        enabled, iteration completes without yielding a frame. When iteration
+        is stopped early, call ``aclose()`` on the generator to promptly close
+        the remote stream.
 
         Args:
             image: If True, include RGB physical-camera frames under key ``"image"``.
@@ -208,6 +227,18 @@ class AsyncXR:
 
         Yields:
             Dictionaries mapping enabled modality keys to their corresponding values.
+
+        Example:
+            Close a stream explicitly when leaving the loop early::
+
+                stream = xr.sense(head=True, hands=True)
+                try:
+                    async for frame in stream:
+                        process(frame)
+                        if finished():
+                            break
+                finally:
+                    await stream.aclose()
         """
         keys: list[str] = []
         cmds: list[Any] = []
@@ -252,6 +283,9 @@ class AsyncXR:
 
         Returns:
             None.
+
+        Raises:
+            ValueError: If the asset lacks a key, MIME type, or encoded data.
         """
         await self._execute_single(CreateOrUpdateAssetsCommand(assets=[asset], alt_path=alt_path))
 
@@ -274,6 +308,10 @@ class AsyncXR:
 
         Returns:
             None.
+
+        Raises:
+            ValueError: If neither deletion target is supplied, both are
+                supplied, or a key is empty.
         """
         _keys = _ensure_iterable(keys, str)
         await self._execute_single(DestroyAssetCommand(keys=_keys, all_assets=all_assets))
@@ -288,6 +326,9 @@ class AsyncXR:
 
         Returns:
             None.
+
+        Raises:
+            ValueError: If the batch is empty or an element has an empty key.
         """
         await self._execute_single(
             CreateOrUpdateElementCommand(elements=_ensure_iterable(element, Element))
@@ -312,6 +353,10 @@ class AsyncXR:
 
         Returns:
             None.
+
+        Raises:
+            ValueError: If neither deletion target is supplied, both are
+                supplied, or an element has an empty key.
         """
         keys = None
         if element is not None:
@@ -327,7 +372,11 @@ class AsyncXR:
 
 
 class AsyncGeneratorIterator(Iterator[dict[str, Any]]):
-    """Blocking iterator over an async generator, running on a given event loop."""
+    """Blocking iterator backed by an async generator on another event loop.
+
+    Instances are returned by :meth:`SyncXR.sense`. Call :meth:`close` when
+    stopping iteration early so the remote sensing stream is released promptly.
+    """
 
     def __init__(self, agen, loop: asyncio.AbstractEventLoop):
         self._agen = agen
@@ -348,6 +397,7 @@ class AsyncGeneratorIterator(Iterator[dict[str, Any]]):
             raise StopIteration
 
     def close(self) -> None:
+        """Close the underlying async generator and release its remote stream."""
         if self._done:
             return
         self._done = True
@@ -355,6 +405,17 @@ class AsyncGeneratorIterator(Iterator[dict[str, Any]]):
 
 
 class SyncXR(AsyncXR):
+    """Blocking interface for one connected XR client.
+
+    A synchronous application passed to :func:`xarp.server.run` receives an
+    instance of this class. Its methods mirror :class:`AsyncXR` and block until
+    the remote operation completes.
+
+    Args:
+        remote: Active transport for the connected XR client.
+        loop: Event loop that owns the remote client.
+        loop_thread: Thread running ``loop``.
+    """
 
     def __init__(self, remote: RemoteXRClient, loop: asyncio.AbstractEventLoop, loop_thread: Thread):
         super().__init__(remote)
@@ -471,14 +532,29 @@ def serve_pil_image_ephemeral(
         path: str = "/image.png",
         fmt: str = "PNG",
 ) -> str:
-    """
-    Serves `img` at a local URL for at most `ttl_seconds` via a FastAPI app.
-    Spins up a uvicorn server in a background thread and shuts it down after TTL.
+    """Serve an image temporarily from a background HTTP server.
 
-    Notes:
-      - Serves on the local LAN IP (not 127.0.0.1) so XR devices on the same
-        network can reach it.
-      - The URL includes a single-use token for basic access control.
+    The server binds to the machine's LAN address so an XR device on the same
+    network can fetch the image. The returned URL contains an unguessable token,
+    disables caching, and remains available until ``ttl_seconds`` elapses. The
+    token is access control for a short-lived local resource; it does not provide
+    transport encryption.
+
+    Args:
+        img: Pillow image to encode and serve.
+        ttl_seconds: Lifetime of the server in seconds. Must be greater than zero.
+        port: TCP port to bind. Use ``0`` to request an available ephemeral port.
+        path: HTTP route for the encoded image. A leading slash is optional.
+        fmt: Pillow output format. Known formats receive a matching HTTP content
+            type; unknown formats use ``application/octet-stream``.
+
+    Returns:
+        LAN-accessible HTTP URL containing the temporary access token.
+
+    Raises:
+        ValueError: If ``ttl_seconds`` is not positive.
+        OSError: If the LAN address cannot be determined or the server cannot bind.
+        RuntimeError: If Uvicorn does not start within five seconds.
     """
     if ttl_seconds <= 0:
         raise ValueError("ttl_seconds must be > 0")

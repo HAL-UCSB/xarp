@@ -1,3 +1,5 @@
+"""WebSocket server and connection helpers for XARP applications."""
+
 import asyncio
 import inspect
 import logging
@@ -17,6 +19,7 @@ from .settings import get_settings
 
 log = logging.getLogger(__name__)
 
+#: Asynchronous or synchronous application callable accepted by :func:`run`.
 XRApp = (
         Callable[[AsyncXR, dict[str, Any]], Awaitable[None]]
         | Callable[[SyncXR, dict[str, Any]], None]
@@ -24,11 +27,32 @@ XRApp = (
 
 
 def run(xr_app: XRApp) -> None:
-    """
-    Start the XR WebSocket server and block until it shuts down.
+    """Start the XR WebSocket server and block until it shuts down.
 
-    Accepts both async and sync XR app callables.  Sync callables are
-    dispatched via asyncio.to_thread so the event loop is never blocked.
+    The callable is invoked once for each accepted client session. Asynchronous
+    callables receive :class:`xarp.express.AsyncXR`; synchronous callables
+    receive :class:`xarp.express.SyncXR` and run in a worker thread. The second
+    argument contains the WebSocket URL query parameters as strings.
+
+    The listening host, port, and WebSocket path come from
+    :func:`xarp.settings.get_settings`. This function owns the Uvicorn event loop
+    and does not return until the server shuts down.
+
+    Args:
+        xr_app: Function with the signature ``(xr, query_params) -> None``. An
+            async function may return an awaitable; a synchronous function must
+            return normally.
+
+    Raises:
+        Exception: Re-raises an exception from ``xr_app`` after logging it.
+
+    Example:
+        Run a blocking application::
+
+            def app(xr, query_params):
+                xr.write(f"Connected as {query_params.get('name', 'guest')}")
+
+            run(app)
     """
     app = FastAPI()
     settings = get_settings()
@@ -59,6 +83,7 @@ def run(xr_app: XRApp) -> None:
     )
     log.info("Server shut down normally")
 
+
 def make_qrcode_image(
         protocol: str = "ws",
         address: str | None = None,
@@ -67,22 +92,30 @@ def make_qrcode_image(
         qr_code_schema="xarp.websocketurl",
         **query_params: Any,
 ) -> PIL.Image.Image:
-    """
-    Build and optionally display a QR code encoding the XR WebSocket URL.
+    """Build and optionally display a QR code for the XR WebSocket URL.
 
     The QR payload uses the ``xarp.websocketurl=<url>`` scheme so that the
-    client app can detect and connect automatically on scan.
+    client app can detect and connect automatically on scan. Query parameter
+    values are encoded with :func:`urllib.parse.urlencode`; sequences are
+    expanded into repeated keys.
 
     Args:
-        protocol:     WebSocket scheme — ``"ws"`` or ``"wss"``.
-        address:      Server IP or hostname.  Defaults to the local LAN address.
-        path:         WebSocket path.  Defaults to ``settings.ws_path``.
-        show:         If True, open the QR image in the default viewer.
-        qr_scheme:    The client app detects this prefix to extract and connect to the WebSocket URL.
-        **query_params: Additional URL query parameters forwarded to the client.
+        protocol: WebSocket scheme, normally ``"ws"`` or ``"wss"``.
+        address: Server IP address or hostname. Defaults to the machine's LAN
+            address.
+        path: WebSocket route. Defaults to the configured ``ws_path``. A leading
+            slash is added when needed.
+        show: Whether to open the QR image with Pillow's default image viewer.
+        qr_code_schema: Prefix used by the client to recognize the QR payload.
+        **query_params: Additional URL query parameters included in the encoded
+            WebSocket URL.
 
     Returns:
-        A PIL Image of the QR code.
+        Pillow image containing the generated QR code.
+
+    Raises:
+        OSError: If ``address`` is omitted and the LAN address cannot be
+            determined.
     """
 
     if address is None:

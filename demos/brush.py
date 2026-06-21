@@ -45,5 +45,5 @@ def app(xr: SyncXR, *args, **kwargs) -> None:
 
 
 if __name__ == '__main__':
-    make_qrcode_image()
+    make_qrcode_image(address="127.0.0.1")
     run(app)

@@ -1,3 +1,13 @@
+"""Stateless hand-gesture metrics for XARP's 26-joint hand representation.
+
+Unless stated otherwise, a gesture accepts one tracked hand as a tuple of
+:class:`xarp.spatial.Pose` objects. Supplying ``threshold=None`` returns the raw
+metric; supplying a numeric threshold returns a boolean classification.
+Distances are measured in metres. Gesture functions assume that every required
+joint is present; passing an empty or incomplete hand tuple raises
+:class:`IndexError`.
+"""
+
 from typing import Union, Tuple
 
 import numpy as np
@@ -81,11 +91,22 @@ DIGITS = INDEX, MIDDLE, RING, PINKY
 
 
 def finger_extension(hand: Tuple[Pose, ...], chain):
-    """
-    chain: list of joint indices from base (metacarpal) to tip.
-    Returns E in [0,1], where:
-      1 → perfectly straight
-      0 → maximally curled (practically ~0.3–0.6 for real hands)
+    """Measure how directly a finger spans from its base to its tip.
+
+    The metric is chord length divided by the joint-chain path length and is
+    clamped to ``[0.0, 1.0]``. A straight finger approaches ``1.0``; a curled
+    finger produces a smaller value.
+
+    Args:
+        hand: Tracked hand poses indexed by the joint constants in this module.
+        chain: Ordered joint indices from the finger's metacarpal to its tip.
+
+    Returns:
+        Extension metric in ``[0.0, 1.0]``.
+
+    Raises:
+        IndexError: If ``hand`` does not contain a requested joint.
+        ZeroDivisionError: If the chain has no measurable path length.
     """
     pts = [hand[i].position for i in chain]
 
@@ -97,18 +118,33 @@ def finger_extension(hand: Tuple[Pose, ...], chain):
 
 
 def finger_flexion(hand: Tuple[Pose, ...], chain):
-    """
-    Complement of finger_extension:
-      1 → strongly flexed
-      0 → perfectly straight
+    """Measure finger flexion as the complement of extension.
+
+    Args:
+        hand: Tracked hand poses indexed by the joint constants in this module.
+        chain: Ordered joint indices from the finger's metacarpal to its tip.
+
+    Returns:
+        Flexion metric in ``[0.0, 1.0]``. A straight finger approaches ``0.0``.
     """
     return float(1.0 - finger_extension(hand, chain))
 
 
 def palm_normal(hand: Tuple[Pose, ...]):
-    """
-    Palm normal from wrist–index–middle metacarpals.
-    Sign depends on coordinate convention.
+    """Compute an unnormalized palm normal.
+
+    The cross product uses vectors from the wrist to the index and middle
+    metacarpals. Its sign therefore depends on the hand and coordinate-system
+    conventions.
+
+    Args:
+        hand: Tracked hand poses indexed by the joint constants in this module.
+
+    Returns:
+        Cross-product vector normal to the wrist/index/middle plane.
+
+    Raises:
+        IndexError: If ``hand`` lacks one of the required joints.
     """
     wrist = hand[WRIST].position
     idx_m = hand[INDEX_METACARPAL].position
@@ -122,25 +158,69 @@ def palm_normal(hand: Tuple[Pose, ...]):
 # ----------------- pinch gestures -----------------
 
 def pinch(hand: Tuple[Pose, ...], threshold=0.015) -> Union[bool, float]:
-    """
-    Thumb–index pinch. Metric: distance thumb_tip–index_tip (m).
-    Default threshold ~1.5 cm.
+    """Detect a thumb-to-index-finger pinch.
+
+    Args:
+        hand: Tracked hand poses.
+        threshold: Maximum fingertip distance in metres. The default is 0.015
+            metres (1.5 cm). Use ``None`` to return the distance instead.
+
+    Returns:
+        Whether the fingertip distance is below ``threshold``, or the distance
+        in metres when ``threshold`` is ``None``.
     """
     dist = hand[THUMB_TIP].position.distance(hand[INDEX_TIP].position)
     return dist if threshold is None else dist < threshold
 
 
 def pinch_middle(hand: Tuple[Pose, ...], threshold=0.015) -> Union[bool, float]:
+    """Detect a thumb-to-middle-finger pinch.
+
+    Args:
+        hand: Tracked hand poses.
+        threshold: Maximum fingertip distance in metres, or ``None`` to return
+            the distance. The default is 0.015 metres (1.5 cm).
+
+    Returns:
+        Boolean classification, or fingertip distance in metres when
+        ``threshold`` is ``None``.
+    """
     dist = hand[THUMB_TIP].position.distance(hand[MIDDLE_TIP].position)
     return dist if threshold is None else dist < threshold
 
 
 def pinch_ring(hand: Tuple[Pose, ...], threshold=0.015) -> Union[bool, float]:
+    """Detect a thumb-to-ring-finger pinch.
+
+    Args:
+        hand: Tracked hand poses.
+        threshold: Maximum fingertip distance in metres, or ``None`` to return
+            the distance. The default is 0.015 metres (1.5 cm).
+
+    Returns:
+        Boolean classification, or fingertip distance in metres when
+        ``threshold`` is ``None``.
+    """
     dist = hand[THUMB_TIP].position.distance(hand[RING_TIP].position)
     return dist if threshold is None else dist < threshold
 
 
 def double_pinch(hands: Hands, threshold=None) -> Union[None, float]:
+    """Measure the distance between the centres of two pinches.
+
+    Args:
+        hands: Left and right tracked-hand payload. Both hands must be present.
+        threshold: Optional per-hand thumb/index pinch threshold in metres. When
+            provided, the function returns ``None`` unless both hands satisfy
+            :func:`pinch`. When omitted, no pinch classification is performed.
+
+    Returns:
+        Distance in metres between the two thumb/index midpoints, or ``None``
+        when a required pinch is not detected.
+
+    Raises:
+        IndexError: If either hand is not tracked or lacks required joints.
+    """
     if threshold is not None:
         if not pinch(hands["left"], threshold) or not pinch(hands["right"], threshold):
             return None
@@ -159,30 +239,51 @@ def double_pinch(hands: Hands, threshold=None) -> Union[None, float]:
 # ----------------- pose / extension gestures -----------------
 
 def fist(hand: Tuple[Pose, ...], threshold=0.6) -> Union[bool, float]:
-    """
-    Metric: mean flexion of the four long fingers in [0,1].
-    Higher → more fist-like.
-    Reasonable default: threshold=0.6
+    """Detect a fist from mean non-thumb finger flexion.
+
+    Args:
+        hand: Tracked hand poses.
+        threshold: Minimum mean flexion for a fist, or ``None`` to return the
+            metric. The default is ``0.6``.
+
+    Returns:
+        Whether mean flexion exceeds ``threshold``, or the mean flexion in
+        ``[0.0, 1.0]`` when ``threshold`` is ``None``.
     """
     metric = sum(finger_flexion(hand, chain) for chain in DIGITS) / len(DIGITS)
     return metric if threshold is None else metric > threshold
 
 
 def open_hand(hand: Tuple[Pose, ...], threshold=0.8) -> Union[bool, float]:
-    """
-    Metric: mean extension of the four long fingers in [0,1].
-    Higher → more open.
-    Reasonable default: threshold=0.8
+    """Detect an open hand from mean non-thumb finger extension.
+
+    Args:
+        hand: Tracked hand poses.
+        threshold: Minimum mean extension for an open hand, or ``None`` to
+            return the metric. The default is ``0.8``.
+
+    Returns:
+        Whether mean extension exceeds ``threshold``, or the mean extension in
+        ``[0.0, 1.0]`` when ``threshold`` is ``None``.
     """
     metric = sum(finger_extension(hand, chain) for chain in DIGITS) / len(DIGITS)
     return metric if threshold is None else metric > threshold
 
 
 def point(hand: Tuple[Pose, ...], threshold=0.3) -> Union[bool, float]:
-    """
-    Index extended, others less extended.
-    Metric = ext(index) - max(ext(middle, ring, pinky)).
-    Range roughly [-1,1]. Point-like when > 0.3.
+    """Detect pointing by comparing index extension with the other digits.
+
+    The metric is the index extension minus the greatest extension among the
+    middle, ring, and pinky fingers.
+
+    Args:
+        hand: Tracked hand poses.
+        threshold: Minimum metric for pointing, or ``None`` to return the raw
+            metric. The default is ``0.3``.
+
+    Returns:
+        Whether the metric exceeds ``threshold``, or the metric (approximately
+        ``[-1.0, 1.0]``) when ``threshold`` is ``None``.
     """
     idx = finger_extension(hand, INDEX)
     mid = finger_extension(hand, MIDDLE)
@@ -194,10 +295,19 @@ def point(hand: Tuple[Pose, ...], threshold=0.3) -> Union[bool, float]:
 
 
 def victory(hand: Tuple[Pose, ...], threshold=0.5) -> Union[bool, float]:
-    """
-    Index + middle extended; ring + pinky more flexed.
-    Metric = (ext(index)+ext(middle)) - (ext(ring)+ext(pinky)).
-    Straight V should easily exceed 0.5.
+    """Detect a victory sign from relative finger extension.
+
+    The metric is ``extension(index) + extension(middle)`` minus
+    ``extension(ring) + extension(pinky)``.
+
+    Args:
+        hand: Tracked hand poses.
+        threshold: Minimum metric for a victory sign, or ``None`` to return the
+            metric. The default is ``0.5``.
+
+    Returns:
+        Whether the metric exceeds ``threshold``, or the raw metric when
+        ``threshold`` is ``None``.
     """
     idx = finger_extension(hand, INDEX)
     mid = finger_extension(hand, MIDDLE)
@@ -211,9 +321,16 @@ def victory(hand: Tuple[Pose, ...], threshold=0.5) -> Union[bool, float]:
 # ----------------- thumb orientation -----------------
 
 def thumbs_up(hand: Tuple[Pose, ...], threshold=0.7) -> Union[bool, float]:
-    """
-    Metric: cosine similarity between thumb direction and palm normal.
-    Range [-1,1]; > 0.7 means roughly aligned.
+    """Detect alignment between the thumb direction and palm normal.
+
+    Args:
+        hand: Tracked hand poses.
+        threshold: Minimum cosine similarity for detection, or ``None`` to
+            return the similarity. The default is ``0.7``.
+
+    Returns:
+        Whether similarity exceeds ``threshold``, or cosine similarity in
+        ``[-1.0, 1.0]`` when ``threshold`` is ``None``.
     """
     thumb_vec = hand[THUMB_TIP].position - hand[THUMB_METACARPAL].position
     metric = cosine_similarity(thumb_vec, palm_normal(hand))
@@ -223,11 +340,16 @@ def thumbs_up(hand: Tuple[Pose, ...], threshold=0.7) -> Union[bool, float]:
 # ----------------- flat palm -----------------
 
 def flat_palm(hand: Tuple[Pose, ...], threshold=0.015) -> Union[bool, float]:
-    """
-    Metric: max distance (m) of metacarpal joints (index/middle/ring/pinky)
-    from their best-fit plane. Smaller → flatter palm.
-    For a hand ~7–9 cm wide and decent tracking, 0.015 m (~1.5 cm)
-    is a reasonable flatness threshold.
+    """Detect a flat palm using metacarpal distance from a best-fit plane.
+
+    Args:
+        hand: Tracked hand poses.
+        threshold: Maximum plane distance in metres, or ``None`` to return the
+            distance. The default is 0.015 metres (1.5 cm).
+
+    Returns:
+        Whether the maximum distance is below ``threshold``, or the maximum
+        distance in metres when ``threshold`` is ``None``.
     """
     pts = np.array([
         hand[INDEX_METACARPAL].position.to_numpy(),
@@ -248,11 +370,19 @@ def flat_palm(hand: Tuple[Pose, ...], threshold=0.015) -> Union[bool, float]:
 # ----------------- coarse grab -----------------
 
 def coarse_grab(hand: Tuple[Pose, ...], threshold=0.035) -> Union[bool, float]:
-    """
-    Metric: mean distance (m) from thumb tip to all other fingertips.
-    Lower → more closed / grab-like (no contact/force semantics).
-    For an adult hand, open spread ≈ 5–7 cm; closed fist ≈ 1.5–3 cm.
-    Default threshold 3.5 cm (0.035 m) is a reasonable mid-point.
+    """Detect a coarse grab from thumb-to-fingertip distances.
+
+    This geometric metric does not represent contact or force. It averages the
+    thumb-tip distance to the other four fingertips.
+
+    Args:
+        hand: Tracked hand poses.
+        threshold: Maximum mean distance in metres, or ``None`` to return the
+            mean. The default is 0.035 metres (3.5 cm).
+
+    Returns:
+        Whether the mean distance is below ``threshold``, or the mean distance
+        in metres when ``threshold`` is ``None``.
     """
     thumb_tip = hand[THUMB_TIP].position
     tips = [
@@ -266,6 +396,22 @@ def coarse_grab(hand: Tuple[Pose, ...], threshold=0.035) -> Union[bool, float]:
 
 
 def index_thumb_l(hand: Tuple[Pose, ...], threshold: float = 0.3) -> bool | float:
+    """Detect an index-and-thumb L shape.
+
+    The middle, ring, and pinky fingertips must be close to the palm relative
+    to the index fingertip. The reported metric is the dot product of normalized
+    distal index and thumb directions; smaller values are more orthogonal.
+
+    Args:
+        hand: Tracked hand poses.
+        threshold: Maximum direction dot product for detection, or ``None`` to
+            return the metric. The default is ``0.3``.
+
+    Returns:
+        Boolean classification when a threshold is supplied. With ``None``,
+        returns the direction dot product, except that a failed curled-finger
+        precondition returns ``False``.
+    """
     index_to_palm_dist = hand[INDEX_TIP].position.distance(hand[PALM].position)
     for other_finger_tip in (PINKY_TIP, RING_TIP, MIDDLE_TIP):
         other_dist = hand[other_finger_tip].position.distance(hand[PALM].position)

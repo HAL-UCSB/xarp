@@ -38,6 +38,18 @@ pip install git+https://github.com/HAL-UCSB/xarp.git
 pip install git+https://github.com/HAL-UCSB/xarp.git --extra agents 
 ```
 
+## Documentation
+
+Build the API reference, serve it at `http://127.0.0.1:8000/`, and open it in
+your browser:
+
+```bash
+uv run docs
+```
+
+Use `uv run docs --build-only` to generate HTML without starting the preview
+server, or `uv run docs --no-open` to serve it without opening a browser.
+
 ## Cite
 
 [Pre-print](https://drive.google.com/file/d/16WzpQYfTPLCkCG6RgnQ2qJAj_GJLU-jh/view?usp=sharing)
