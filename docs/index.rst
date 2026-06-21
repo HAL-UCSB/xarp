@@ -12,3 +12,4 @@ hand-gesture APIs.
    api/server
    api/commands/index
    api/gestures
+   GitHub Repository <https://github.com/HAL-UCSB/xarp>
