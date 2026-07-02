@@ -55,12 +55,24 @@ server, or `uv run docs --no-open` to serve it without opening a browser.
 ## Cite
 
 [Pre-print](https://drive.google.com/file/d/16WzpQYfTPLCkCG6RgnQ2qJAj_GJLU-jh/view?usp=sharing)
+[PACMHCI EICS](https://doi.org/10.1145/3816762)
 
 ```bibtex
-@article{caetano2025xarp,
-  title={XARP: A Human-First and Agent-Ready Extended Reality Toolkit in Python},
-  author={Caetano, Arthur and Kumaran, Radha and Jou, Kelvin and H{\"o}llerer, Tobias and Sra, Misha},
-  journal={arXiv preprint arXiv:2508.04108},
-  year={2025}
+@article{10.1145/3816762,
+author = {Caetano, Arthur and Kumaran, Radha and Jou, Kelvin and H\"{o}llerer, Tobias and Sra, Misha},
+title = {XARP: A Human-First and Agent-Ready Extended Reality Toolkit in Python},
+year = {2026},
+issue_date = {June 2026},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {10},
+number = {4},
+url = {https://doi.org/10.1145/3816762},
+doi = {10.1145/3816762},
+journal = {Proc. ACM Hum.-Comput. Interact.},
+month = jun,
+articleno = {EICS010},
+numpages = {33},
+keywords = {Toolkit, XR, Python, AI, Agents, Model Context Protocol}
 }
 ```
