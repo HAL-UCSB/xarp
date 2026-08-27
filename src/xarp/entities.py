@@ -184,6 +184,7 @@ class Element(BaseModel):
 
     play: bool | None = None
     time: float | None = None
+    occlusion: bool | None = None
 
     @field_validator("color", mode="before")
     @classmethod

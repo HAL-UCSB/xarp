@@ -385,6 +385,27 @@ class TestElement(unittest.TestCase):
         self.assertIsNone(e.play)
         self.assertIsNone(e.time)
 
+    def test_occlusion_default_none(self):
+        self.assertIsNone(Element().occlusion)
+
+    def test_occlusion_accepted(self):
+        self.assertTrue(Element(occlusion=True).occlusion)
+        self.assertFalse(Element(occlusion=False).occlusion)
+
+    def test_occlusion_survives_round_trip(self):
+        for value in (True, False):
+            with self.subTest(occlusion=value):
+                dumped = Element(key="e", occlusion=value).model_dump()
+                self.assertIs(dumped["occlusion"], value)
+                self.assertIs(Element(**dumped).occlusion, value)
+
+    def test_occlusion_omitted_from_dump_when_unset(self):
+        self.assertNotIn("occlusion", Element(key="e").model_dump(exclude_none=True))
+
+    def test_occlusion_typo_rejected(self):
+        with self.assertRaises(ValidationError):
+            Element(occlusionn=True)
+
 
 if __name__ == "__main__":
     unittest.main()

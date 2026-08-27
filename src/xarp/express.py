@@ -650,11 +650,13 @@ if agents_available:
             euler_angles: tuple[float, float, float],
             scale: tuple[float, float, float],
             color: tuple[float, float, float, float],
+            occlusion: bool | None = None,
     ) -> Element:
         return Element(
             key=key,
             asset=asset,
             color=color,
+            occlusion=occlusion,
             transform=Transform(
                 position=Vector3.from_xyz(*position),
                 rotation=Quaternion.from_euler_angles(*euler_angles),
@@ -726,6 +728,7 @@ if agents_available:
                 euler_angles: tuple[float, float, float] = (0, 0, 0),
                 scale: tuple[float, float, float] = (1, 1, 1),
                 color: tuple[float, float, float, float] = (1, 1, 1, 1),
+                occlusion: bool = True,
         ) -> None:
             """Create or update a GLB-based element in the scene.
 
@@ -740,6 +743,9 @@ if agents_available:
                     in degrees.
                 scale: Non-uniform scale factors (x, y, z).
                 color: RGBA color multiplier with components in [0.0, 1.0].
+                occlusion: If True, physical objects nearer to the viewer than the
+                    element hide the part of it they are in front of. If False, the
+                    element always draws on top of passthrough.
 
             Returns:
                 None
@@ -759,6 +765,7 @@ if agents_available:
                 euler_angles=euler_angles,
                 scale=scale,
                 color=color,
+                occlusion=occlusion,
             )
             await self.update(element)
 
@@ -769,6 +776,7 @@ if agents_available:
                 position: tuple[float, float, float] = (0, 0, 0),
                 euler_angles: tuple[float, float, float] = (0, 0, 0),
                 color: tuple[float, float, float, float] = (1, 1, 1, 1),
+                occlusion: bool = True,
         ) -> None:
             """Create or update a text label element in the scene.
 
@@ -779,6 +787,9 @@ if agents_available:
                 euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
                     in degrees.
                 color: RGBA color multiplier with components in [0.0, 1.0].
+                occlusion: If True, physical objects nearer to the viewer than the
+                    element hide the part of it they are in front of. If False, the
+                    element always draws on top of passthrough.
 
             Returns:
                 None
@@ -790,6 +801,7 @@ if agents_available:
                 euler_angles=euler_angles,
                 scale=(1, 1, 1),
                 color=color,
+                occlusion=occlusion,
             ))
 
         async def create_or_update_cube(
@@ -799,6 +811,7 @@ if agents_available:
                 euler_angles: tuple[float, float, float] = (0, 0, 0),
                 scale: tuple[float, float, float] = (1, 1, 1),
                 color: tuple[float, float, float, float] = (1, 1, 1, 1),
+                occlusion: bool = True,
         ) -> None:
             """Create or update a cube primitive element in the scene.
 
@@ -809,6 +822,9 @@ if agents_available:
                     in degrees.
                 scale: Non-uniform scale factors (x, y, z).
                 color: RGBA color multiplier with components in [0.0, 1.0].
+                occlusion: If True, physical objects nearer to the viewer than the
+                    element hide the part of it they are in front of. If False, the
+                    element always draws on top of passthrough.
 
             Returns:
                 None
@@ -820,6 +836,7 @@ if agents_available:
                 euler_angles=euler_angles,
                 scale=scale,
                 color=color,
+                occlusion=occlusion,
             ))
 
         async def create_or_update_sphere(
@@ -829,6 +846,7 @@ if agents_available:
                 euler_angles: tuple[float, float, float] = (0, 0, 0),
                 scale: tuple[float, float, float] = (1, 1, 1),
                 color: tuple[float, float, float, float] = (1, 1, 1, 1),
+                occlusion: bool = True,
         ) -> None:
             """Create or update a sphere primitive element in the scene.
 
@@ -839,6 +857,9 @@ if agents_available:
                     in degrees.
                 scale: Non-uniform scale factors (x, y, z).
                 color: RGBA color multiplier with components in [0.0, 1.0].
+                occlusion: If True, physical objects nearer to the viewer than the
+                    element hide the part of it they are in front of. If False, the
+                    element always draws on top of passthrough.
 
             Returns:
                 None
@@ -850,6 +871,7 @@ if agents_available:
                 euler_angles=euler_angles,
                 scale=scale,
                 color=color,
+                occlusion=occlusion,
             ))
 
         async def create_or_update_image(
@@ -860,6 +882,7 @@ if agents_available:
                 euler_angles: tuple[float, float, float] = (0, 0, 0),
                 scale: tuple[float, float, float] = (1, 1, 1),
                 color: tuple[float, float, float, float] = (1, 1, 1, 1),
+                occlusion: bool = True,
         ) -> None:
             """Create or update an image-based element in the scene.
 
@@ -874,6 +897,9 @@ if agents_available:
                     in degrees.
                 scale: Non-uniform scale factors (x, y, z).
                 color: RGBA color multiplier with components in [0.0, 1.0].
+                occlusion: If True, physical objects nearer to the viewer than the
+                    element hide the part of it they are in front of. If False, the
+                    element always draws on top of passthrough.
 
             Returns:
                 None
@@ -886,6 +912,7 @@ if agents_available:
                 euler_angles=euler_angles,
                 scale=scale,
                 color=color,
+                occlusion=occlusion,
             ))
 
 
@@ -930,6 +957,7 @@ if agents_available:
                 euler_angles: tuple[float, float, float] = (0, 0, 0),
                 scale: tuple[float, float, float] = (1, 1, 1),
                 color: tuple[float, float, float, float] = (1, 1, 1, 1),
+                occlusion: bool = True,
         ) -> None:
             """Create or update a GLB-based element in the scene.
 
@@ -944,6 +972,9 @@ if agents_available:
                     in degrees.
                 scale: Non-uniform scale factors (x, y, z).
                 color: RGBA color multiplier with components in [0.0, 1.0].
+                occlusion: If True, physical objects nearer to the viewer than the
+                    element hide the part of it they are in front of. If False, the
+                    element always draws on top of passthrough.
 
             Returns:
                 None
@@ -955,6 +986,7 @@ if agents_available:
                 euler_angles=euler_angles,
                 scale=scale,
                 color=color,
+                occlusion=occlusion,
             ))
 
         def create_or_update_label(
@@ -964,6 +996,7 @@ if agents_available:
                 position: tuple[float, float, float] = (0, 0, 0),
                 euler_angles: tuple[float, float, float] = (0, 0, 0),
                 color: tuple[float, float, float, float] = (1, 1, 1, 1),
+                occlusion: bool = True,
         ) -> None:
             """Create or update a text label element in the scene.
 
@@ -974,6 +1007,9 @@ if agents_available:
                 euler_angles: Rotation expressed as Euler angles (roll, pitch, yaw),
                     in degrees.
                 color: RGBA color multiplier with components in [0.0, 1.0].
+                occlusion: If True, physical objects nearer to the viewer than the
+                    element hide the part of it they are in front of. If False, the
+                    element always draws on top of passthrough.
 
             Returns:
                 None
@@ -985,6 +1021,7 @@ if agents_available:
                 euler_angles=euler_angles,
                 scale=(1, 1, 1),
                 color=color,
+                occlusion=occlusion,
             ))
 
         def create_or_update_cube(
@@ -994,6 +1031,7 @@ if agents_available:
                 euler_angles: tuple[float, float, float] = (0, 0, 0),
                 scale: tuple[float, float, float] = (1, 1, 1),
                 color: tuple[float, float, float, float] = (1, 1, 1, 1),
+                occlusion: bool = True,
         ) -> None:
             """Create or update a cube primitive element in the scene.
 
@@ -1004,6 +1042,9 @@ if agents_available:
                     in degrees.
                 scale: Non-uniform scale factors (x, y, z).
                 color: RGBA color multiplier with components in [0.0, 1.0].
+                occlusion: If True, physical objects nearer to the viewer than the
+                    element hide the part of it they are in front of. If False, the
+                    element always draws on top of passthrough.
 
             Returns:
                 None
@@ -1015,6 +1056,7 @@ if agents_available:
                 euler_angles=euler_angles,
                 scale=scale,
                 color=color,
+                occlusion=occlusion,
             ))
 
         def create_or_update_sphere(
@@ -1024,6 +1066,7 @@ if agents_available:
                 euler_angles: tuple[float, float, float] = (0, 0, 0),
                 scale: tuple[float, float, float] = (1, 1, 1),
                 color: tuple[float, float, float, float] = (1, 1, 1, 1),
+                occlusion: bool = True,
         ) -> None:
             """Create or update a sphere primitive element in the scene.
 
@@ -1034,6 +1077,9 @@ if agents_available:
                     in degrees.
                 scale: Non-uniform scale factors (x, y, z).
                 color: RGBA color multiplier with components in [0.0, 1.0].
+                occlusion: If True, physical objects nearer to the viewer than the
+                    element hide the part of it they are in front of. If False, the
+                    element always draws on top of passthrough.
 
             Returns:
                 None
@@ -1045,6 +1091,7 @@ if agents_available:
                 euler_angles=euler_angles,
                 scale=scale,
                 color=color,
+                occlusion=occlusion,
             ))
 
         def create_or_update_image(
@@ -1055,6 +1102,7 @@ if agents_available:
                 euler_angles: tuple[float, float, float] = (0, 0, 0),
                 scale: tuple[float, float, float] = (1, 1, 1),
                 color: tuple[float, float, float, float] = (1, 1, 1, 1),
+                occlusion: bool = True,
         ) -> None:
             """Create or update an image-based element in the scene.
 
@@ -1069,6 +1117,9 @@ if agents_available:
                     in degrees.
                 scale: Non-uniform scale factors (x, y, z).
                 color: RGBA color multiplier with components in [0.0, 1.0].
+                occlusion: If True, physical objects nearer to the viewer than the
+                    element hide the part of it they are in front of. If False, the
+                    element always draws on top of passthrough.
 
             Returns:
                 None
@@ -1081,4 +1132,5 @@ if agents_available:
                 euler_angles=euler_angles,
                 scale=scale,
                 color=color,
+                occlusion=occlusion,
             ))
