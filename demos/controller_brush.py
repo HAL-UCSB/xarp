@@ -5,7 +5,7 @@ Proposed public API (following xr.hands() / xr.sense(hands=True)):
     stream = xr.sense(controllers=True)         # repeated samples
     controllers = frame["controllers"]
 
-Proposed model: Controllers(session_id, left, right).
+Proposed model: Controllers(left, right).
 Each side always exists, even when unavailable, with:
     connected: bool
     tracked: bool
@@ -15,21 +15,13 @@ Each side always exists, even when unavailable, with:
     thumbstick: tuple[float, float]  # each axis -1..1
     buttons.primary: bool       # X on left, A on right
     buttons.secondary: bool     # Y on left, B on right
-    buttons.primary_press_count: int
-    tracking_generation: int
 
-Counter semantics PROPOSED FOR REVIEW:
-- primary_press_count increments on each press; holding does not increment it.
-- Counters accumulate within a session, surviving dropped stream samples.
-- tracking_generation increments on each loss of valid connection/tracking,
-  even if the loss and recovery occur between delivered samples.
-- session_id changes on a new connection; counters are baselined on first sample.
-- Device-side input sampling must capture these transitions independently of
-  Python consumption. Counters cannot recover transitions never captured.
-
-These fields are a proposal, not an agreed or implemented protocol. They allow
-this example to notice clear presses and tracking interruptions across dropped
-frames without claiming to provide a general ordered event history.
+Buttons report current held state. The demo detects a clear press locally
+when the left primary button changes from released to pressed. A disconnected
+left controller is treated as released; its button does not require a valid pose.
+With rt=True, intermediate samples may be dropped: brief button presses or
+tracking interruptions between delivered samples can be missed. Reliable event
+delivery is a separate design question, not implemented by this draft.
 
 Poses must use the same space as scene elements. Exact conversion and units
 must be verified in the client before implementation. Trigger thresholds below
@@ -57,9 +49,7 @@ def app(xr: SyncXR, *args, **kwargs) -> None:
         transform=Transform(scale=Vector3.one() * 0.02),
     )
     i = 0
-    session_id = None
-    tracking_generation = None
-    clear_count = 0
+    clear_was_pressed = False
     armed = False
     drawing = False
     cursor_visible = False
@@ -71,22 +61,11 @@ def app(xr: SyncXR, *args, **kwargs) -> None:
             controllers = frame["controllers"]
             left, right = controllers.left, controllers.right
 
-            if controllers.session_id != session_id:
-                session_id = controllers.session_id
-                tracking_generation = right.tracking_generation
-                clear_count = left.buttons.primary_press_count
-                armed = drawing = False
-
-            # Detect an interruption even if no invalid sample reached Python.
-            if right.tracking_generation != tracking_generation:
-                tracking_generation = right.tracking_generation
-                armed = drawing = False
-
-            clear_now = left.buttons.primary_press_count > clear_count
-            clear_count = left.buttons.primary_press_count
+            clear_pressed = left.connected and left.buttons.primary
+            clear_now = clear_pressed and not clear_was_pressed
+            clear_was_pressed = clear_pressed
             if clear_now:
                 # Like the original hand demo, clear all scene elements.
-                # Multiple pending clears collapse to one for this demo.
                 xr.destroy_element(all_elements=True)
                 i = 0
                 cursor_visible = False

@@ -6,7 +6,7 @@ Run from the repository root:
 These tests exercise the actual demo with real XARP Element/Pose models and
 test-only controller samples. They do not implement or verify the proposed
 controller protocol, asynchronous API, device capture, or network reliability.
-Session changes are injected samples, not real WebSocket reconnections.
+Only delivered button states and tracking validity are observable here.
 """
 
 import importlib.util
@@ -27,7 +27,6 @@ spec.loader.exec_module(demo)
 class FakeButtons:
     primary: bool = False
     secondary: bool = False
-    primary_press_count: int = 0
 
 
 @dataclass
@@ -39,26 +38,24 @@ class FakeController:
     grip: float = 0.0
     thumbstick: tuple[float, float] = (0.0, 0.0)
     buttons: FakeButtons = field(default_factory=FakeButtons)
-    tracking_generation: int = 0
 
 
 @dataclass
 class FakeControllers:
-    session_id: str
     left: FakeController
     right: FakeController
 
 
 def sample(trigger=0.0, *, position=(1, 2, 3), connected=True, tracked=True,
-           pose_valid=True, generation=0, clear_count=0, session="first"):
-    """Build a delivered sample; counters stand in for prior client capture."""
+           pose_valid=True, clear_pressed=False, left_connected=True):
+    """Build one delivered controller-state sample."""
     right = FakeController(
         trigger=trigger, connected=connected, tracked=tracked,
         grip_pose=Pose(position=Vector3(*position)) if pose_valid else None,
-        tracking_generation=generation,
     )
-    left = FakeController(buttons=FakeButtons(primary_press_count=clear_count))
-    return {"controllers": FakeControllers(session, left, right)}
+    left = FakeController(connected=left_connected,
+                          buttons=FakeButtons(primary=clear_pressed))
+    return {"controllers": FakeControllers(left, right)}
 
 
 class FakeStream:
@@ -134,21 +131,31 @@ class TestControllerBrushDraft(unittest.TestCase):
                          sample(.5), sample(.2), sample(.5), sample(.8))
         self.assertEqual([i for i, _ in xr.paints], [3, 4, 7])
 
-    def test_clear_wins_and_a_held_count_does_not_clear_twice(self):
-        xr = self.replay(sample(), sample(1), sample(1, clear_count=1),
-                         sample(1, clear_count=1))
+    def test_clear_wins_and_holding_button_does_not_clear_twice(self):
+        xr = self.replay(sample(), sample(1), sample(1, clear_pressed=True),
+                         sample(1, clear_pressed=True))
         self.assertEqual(xr.clears, [(2, {"all_elements": True})])
         self.assertEqual([i for i, _ in xr.paints], [1, 3])
         self.assertEqual([e.key for _, e in xr.paints], ["paint_0", "paint_0"])
 
-    def test_counter_jump_clears_once_even_when_current_button_is_released(self):
-        xr = self.replay(sample(), sample(clear_count=3), sample(clear_count=3))
-        self.assertEqual(xr.clears, [(1, {"all_elements": True})])
+    def test_release_then_press_clears_again(self):
+        xr = self.replay(sample(), sample(clear_pressed=True),
+                         sample(clear_pressed=True), sample(),
+                         sample(clear_pressed=True))
+        self.assertEqual([i for i, _ in xr.clears], [1, 4])
+
+    def test_disconnected_left_button_does_not_clear(self):
+        xr = self.replay(sample(clear_pressed=True, left_connected=False))
+        self.assertEqual(xr.clears, [])
+
+    def test_unobserved_button_press_cannot_be_detected(self):
+        # A press/release between these delivered samples is not observable.
+        xr = self.replay(sample(), sample())
+        self.assertEqual(xr.clears, [])
 
     def test_invalid_tracking_hides_cursor_and_requires_release_after_recovery(self):
-        xr = self.replay(sample(), sample(1), sample(1, tracked=False, generation=1),
-                         sample(1, generation=1), sample(0, generation=1),
-                         sample(1, generation=1))
+        xr = self.replay(sample(), sample(1), sample(1, tracked=False),
+                         sample(1), sample(0), sample(1))
         self.assertEqual([i for i, _ in xr.paints], [1, 5])
         self.assertEqual([(i, e.active) for i, e in xr.cursors],
                          [(0, True), (1, True), (2, False), (3, True), (4, True), (5, True)])
@@ -160,17 +167,10 @@ class TestControllerBrushDraft(unittest.TestCase):
                                  sample(0), sample(1))
                 self.assertEqual([i for i, _ in xr.paints], [4])
 
-    def test_tracking_counter_detects_interruption_between_delivered_frames(self):
-        xr = self.replay(sample(), sample(1), sample(1, generation=1),
-                         sample(0, generation=1), sample(1, generation=1))
-        self.assertEqual([i for i, _ in xr.paints], [1, 4])
-
-    def test_new_session_baselines_old_clear_count_and_requires_trigger_release(self):
-        xr = self.replay(sample(), sample(1), sample(1, session="second", clear_count=4),
-                         sample(0, session="second", clear_count=4),
-                         sample(1, session="second", clear_count=4))
-        self.assertEqual([i for i, _ in xr.paints], [1, 4])
-        self.assertEqual(xr.clears, [])
+    def test_new_app_invocation_requires_trigger_release(self):
+        self.replay(sample(), sample(1))
+        xr = self.replay(sample(1), sample(0), sample(1))
+        self.assertEqual([i for i, _ in xr.paints], [2])
 
     def test_stream_closes_when_scene_update_raises(self):
         xr = FakeXR([sample()], fail_update=True)
