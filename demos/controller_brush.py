@@ -1,4 +1,4 @@
-"""Controller demo: requires the updated Quest client; hardware validation pending.
+"""Draw with Quest controllers using a client with the "controllers" executor.
 
 Python API (following xr.hands() / xr.sense(hands=True)):
     controllers = xr.controllers()              # one sample
@@ -21,12 +21,11 @@ when the left primary button changes from released to pressed. A disconnected
 left controller is treated as released; its button does not require a valid pose.
 With rt=True, intermediate samples may be dropped: brief button presses or
 tracking interruptions between delivered samples can be missed. Reliable event
-delivery is a separate design question, not implemented by this draft.
+delivery is not provided by this sampling API.
 
-Poses must use the same space as scene elements. Exact conversion and units
-must be verified in the client before implementation. Trigger thresholds below
-are example values to confirm on hardware. Running on a device requires a
-Quest client that implements the "controllers" command.
+The Quest client converts grip poses into the world space used by scene elements.
+Release the right trigger once at startup and after tracking loss to arm drawing.
+Press the left X button to clear all scene elements.
 """
 
 from xarp import colors

@@ -14,6 +14,27 @@ XARP is a Python toolkit for extended reality. It replaces lengthy build-deploy 
 | [<img src="https://github.com/user-attachments/assets/e6b5ea80-2d6d-461d-a3d3-8cac555de865" width="300"/>][video] | [<img src="https://github.com/user-attachments/assets/d89ebd3d-8b2f-4dc5-8b2d-ddcf57f2a3d1" width="300"/>][video-feed] |
 | Video Player | Depth Images |
 
+### Quest controller brush
+
+Requires the Quest client's `controller-support` branch and this Python repo's
+`controller-models` branch. Run from the Python repo with its environment active:
+
+```bash
+python demos/controllers.py
+# After confirming controller samples, stop that demo and run:
+python demos/controller_brush.py
+```
+
+Scan the displayed QR code in the Quest client. Release the right trigger once,
+then hold it and move the controller to draw. Release it to stop. Press **X on the
+left controller** to clear all scene elements. After tracking loss, release the
+trigger again before drawing. Brief button presses can be missed between samples.
+
+Before sharing a new Quest build, check drawing, clearing, tracking recovery,
+controller disconnect/reconnect, and QR reconnection after removing the headset.
+Also confirm paint follows the controller after recentering. Automated checks do
+not replace these device checks.
+
 ## Built with XARP
 ### UCSB W26 CMPSC 291I
 | <img src="https://github.com/user-attachments/assets/dab32046-612f-4b27-971c-98d5a1227cbc" width="300"/> | <img src="https://github.com/user-attachments/assets/af79b1a7-6d91-4211-8218-5e9fadf833f5" width="300"/> |
