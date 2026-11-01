@@ -30,11 +30,12 @@ from xarp.commands.sensing import (
     EyeCommand,
     HeadCommand,
     HandsCommand,
+    ControllersCommand,
     DepthCommand,
     VirtualImageCommand,
 )
 from xarp.commands.ui import WriteCommand, SayCommand, ReadCommand, PassthroughCommand
-from xarp.data_models import DeviceInfo, Hands
+from xarp.data_models import Controllers, DeviceInfo, Hands
 from xarp.entities import ImageAsset, Asset, Element, GLBAsset, TextAsset, DefaultAssets
 from xarp.remote import RemoteXRClient
 from xarp.spatial import Pose, Transform, Vector3, Quaternion
@@ -177,6 +178,14 @@ class AsyncXR:
         """
         return await self._execute_single(HandsCommand())
 
+    async def controllers(self) -> Controllers:
+        """Return controller states. Requires a client with controller support.
+
+        Use grip poses only when connected, tracked, and non-null. Buttons
+        report current held states and do not require a tracked pose.
+        """
+        return await self._execute_single(ControllersCommand())
+
     # ---- SENSING (STREAM) ----
 
     async def sense(
@@ -188,6 +197,7 @@ class AsyncXR:
             eye: bool = False,
             head: bool = False,
             hands: bool = False,
+            controllers: bool = False,
             rt: bool = True,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """Streams selected sensing modalities continuously. Values are produced
@@ -202,6 +212,9 @@ class AsyncXR:
             eye: If True, include camera pose under key ``"eye"``.
             head: If True, include headset pose under key ``"head"``.
             hands: If True, include hand-tracking payload under key ``"hands"``.
+            controllers: If True, include controller states under key
+                ``"controllers"``. Requires client controller support. Brief
+                button presses between delivered samples may be missed.
             rt: If True, yields the latest available sample at read time (dropping
                 intermediate frames). If False, yields samples sequentially even if
                 delayed.
@@ -230,6 +243,9 @@ class AsyncXR:
         if hands:
             keys.append("hands")
             cmds.append(HandsCommand())
+        if controllers:
+            keys.append("controllers")
+            cmds.append(ControllersCommand())
 
         if not cmds:
             return
@@ -402,6 +418,9 @@ class SyncXR(AsyncXR):
     def hands(self) -> Hands:
         return self._sync(super().hands())
 
+    def controllers(self) -> Controllers:
+        return self._sync(super().controllers())
+
     # ---- SENSING (STREAM) ----
     def sense(
             self,
@@ -412,6 +431,7 @@ class SyncXR(AsyncXR):
             eye: bool = False,
             head: bool = False,
             hands: bool = False,
+            controllers: bool = False,
             rt: bool = True,
     ) -> AsyncGeneratorIterator:
         # super().sense(...) is an async generator function — calling it returns
@@ -423,6 +443,7 @@ class SyncXR(AsyncXR):
             eye=eye,
             head=head,
             hands=hands,
+            controllers=controllers,
             rt=rt,
         )
         return AsyncGeneratorIterator(agen, self._loop)

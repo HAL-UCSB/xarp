@@ -1,11 +1,11 @@
-"""API DESIGN DRAFT: controller support is NOT implemented in XARP yet.
+"""Controller demo: requires the updated Quest client; hardware validation pending.
 
-Proposed public API (following xr.hands() / xr.sense(hands=True)):
+Python API (following xr.hands() / xr.sense(hands=True)):
     controllers = xr.controllers()              # one sample
     stream = xr.sense(controllers=True)         # repeated samples
     controllers = frame["controllers"]
 
-Proposed model: Controllers(left, right).
+Model: Controllers(left, right).
 Each side always exists, even when unavailable, with:
     connected: bool
     tracked: bool
@@ -25,16 +25,18 @@ delivery is a separate design question, not implemented by this draft.
 
 Poses must use the same space as scene elements. Exact conversion and units
 must be verified in the client before implementation. Trigger thresholds below
-are example values to confirm on hardware. This file is syntax-checkable but
-cannot run against the current xr.sense() signature.
+are example values to confirm on hardware. Running on a device requires a
+Quest client that implements the "controllers" command.
 """
 
 from xarp import colors
+from xarp.data_models import Controllers
 from xarp.entities import DefaultAssets, Element
 from xarp.express import SyncXR
 from xarp.server import make_qrcode_image, run
 from xarp.spatial import Transform, Vector3
 
+# Start drawing at 0.8 and stop at 0.2 to avoid toggling from trigger jitter.
 TRIGGER_ON = 0.8
 TRIGGER_OFF = 0.2
 
@@ -54,11 +56,11 @@ def app(xr: SyncXR, *args, **kwargs) -> None:
     drawing = False
     cursor_visible = False
 
-    # Proposed API: NOT supported by the current XARP implementation.
+    # Requires a Quest client with a registered "controllers" executor.
     stream = xr.sense(controllers=True)
     try:
         for frame in stream:
-            controllers = frame["controllers"]
+            controllers: Controllers = frame["controllers"]
             left, right = controllers.left, controllers.right
 
             clear_pressed = left.connected and left.buttons.primary
@@ -90,7 +92,8 @@ def app(xr: SyncXR, *args, **kwargs) -> None:
             elif armed and right.trigger >= TRIGGER_ON:
                 drawing = True
 
-            # Clear wins over drawing in the current processed frame.
+            # Clear skips painting this frame. If the trigger remains held,
+            # drawing resumes next frame, even while the clear button is held.
             if drawing and not clear_now:
                 paint.key = f"paint_{i}"
                 paint.transform.position = right.grip_pose.position

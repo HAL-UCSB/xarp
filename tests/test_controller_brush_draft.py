@@ -3,18 +3,18 @@ r"""Replay the proposed synchronous controller demo without Quest or a server.
 Run from the repository root:
     .\venv\Scripts\python.exe -m unittest discover -s tests -p test_controller_brush_draft.py -v
 
-These tests exercise the actual demo with real XARP Element/Pose models and
-test-only controller samples. They do not implement or verify the proposed
+These tests exercise the actual demo with real XARP models and simulated
+controller samples. They do not implement or verify the proposed
 controller protocol, asynchronous API, device capture, or network reliability.
 Only delivered button states and tracking validity are observable here.
 """
 
 import importlib.util
-from dataclasses import dataclass, field
 from pathlib import Path
 import unittest
 
 from xarp.spatial import Pose, Vector3
+from xarp.data_models import Controller, ControllerButtons, Controllers
 
 
 DEMO_PATH = Path(__file__).resolve().parents[1] / "demos" / "controller_brush.py"
@@ -23,39 +23,18 @@ demo = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(demo)
 
 
-@dataclass
-class FakeButtons:
-    primary: bool = False
-    secondary: bool = False
-
-
-@dataclass
-class FakeController:
-    connected: bool = True
-    tracked: bool = True
-    grip_pose: Pose | None = field(default_factory=Pose)
-    trigger: float = 0.0
-    grip: float = 0.0
-    thumbstick: tuple[float, float] = (0.0, 0.0)
-    buttons: FakeButtons = field(default_factory=FakeButtons)
-
-
-@dataclass
-class FakeControllers:
-    left: FakeController
-    right: FakeController
-
-
 def sample(trigger=0.0, *, position=(1, 2, 3), connected=True, tracked=True,
-           pose_valid=True, clear_pressed=False, left_connected=True):
+           pose_valid=True, clear_pressed=False, left_connected=True,
+           left_tracked=True):
     """Build one delivered controller-state sample."""
-    right = FakeController(
+    right = Controller(
         trigger=trigger, connected=connected, tracked=tracked,
         grip_pose=Pose(position=Vector3(*position)) if pose_valid else None,
     )
-    left = FakeController(connected=left_connected,
-                          buttons=FakeButtons(primary=clear_pressed))
-    return {"controllers": FakeControllers(left, right)}
+    left = Controller(connected=left_connected, tracked=left_tracked,
+                          grip_pose=Pose() if left_tracked else None,
+                      buttons=ControllerButtons(primary=clear_pressed))
+    return {"controllers": Controllers(left=left, right=right)}
 
 
 class FakeStream:
@@ -148,10 +127,17 @@ class TestControllerBrushDraft(unittest.TestCase):
         xr = self.replay(sample(clear_pressed=True, left_connected=False))
         self.assertEqual(xr.clears, [])
 
-    def test_unobserved_button_press_cannot_be_detected(self):
-        # A press/release between these delivered samples is not observable.
-        xr = self.replay(sample(), sample())
-        self.assertEqual(xr.clears, [])
+    def test_clear_works_while_right_controller_is_untracked(self):
+        xr = self.replay(sample(), sample(1),
+                         sample(1, clear_pressed=True, tracked=False))
+        self.assertEqual(xr.clears, [(2, {"all_elements": True})])
+        self.assertEqual([i for i, _ in xr.paints], [1])
+
+    def test_clear_works_while_left_controller_is_untracked(self):
+        xr = self.replay(sample(), sample(1),
+                         sample(1, clear_pressed=True, left_tracked=False))
+        self.assertEqual(xr.clears, [(2, {"all_elements": True})])
+        self.assertEqual([i for i, _ in xr.paints], [1])
 
     def test_invalid_tracking_hides_cursor_and_requires_release_after_recovery(self):
         xr = self.replay(sample(), sample(1), sample(1, tracked=False),

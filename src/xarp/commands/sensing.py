@@ -1,11 +1,11 @@
 import io
-from typing import ClassVar, Literal
+from typing import Any, ClassVar, Literal
 
 import PIL.Image
 from PIL import Image as PIL_Image
 from pydantic import Field
 
-from xarp.data_models import Hands
+from xarp.data_models import Controllers, Hands
 from xarp.entities import ImageAsset
 from xarp.spatial import Pose
 from . import Command, Response
@@ -63,3 +63,12 @@ class HandsCommand(Command):
 
     def validate_response_value(self, value: Response) -> Hands:
         return Hands.model_validate(value)
+
+
+class ControllersCommand(Command):
+    """Request controller states and validate the unwrapped response payload."""
+
+    cmd: Literal["controllers"] = Field(default="controllers", frozen=True)
+
+    def validate_response_value(self, value: Any) -> Controllers:
+        return Controllers.model_validate(value)
