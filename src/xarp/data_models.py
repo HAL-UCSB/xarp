@@ -1,4 +1,4 @@
-from typing import Any, Tuple
+from typing import Annotated, Any, Tuple
 
 import numpy as np
 from pydantic import BaseModel, Field, ConfigDict, field_validator
@@ -26,6 +26,45 @@ class Hands(BaseModel):
         elif side == "right":
             return self.right
         raise KeyError(f"Expected 'left' or 'right', got {side!r}")
+
+
+class ControllerButtons(BaseModel):
+    """Current held states: primary is X/A, secondary is Y/B (left/right)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    primary: bool = False
+    secondary: bool = False
+
+
+class Controller(BaseModel):
+    """One controller sample. Use grip_pose only when connected and tracked.
+
+    Buttons do not require tracking. Pose space and units must match the scene;
+    the Quest capture implementation must establish that conversion.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    connected: bool = False
+    tracked: bool = False
+    grip_pose: Pose | None = None
+    trigger: float = Field(default=0.0, ge=0.0, le=1.0)
+    grip: float = Field(default=0.0, ge=0.0, le=1.0)
+    thumbstick: tuple[
+        Annotated[float, Field(ge=-1.0, le=1.0)],
+        Annotated[float, Field(ge=-1.0, le=1.0)],
+    ] = (0.0, 0.0)
+    buttons: ControllerButtons = Field(default_factory=ControllerButtons)
+
+
+class Controllers(BaseModel):
+    """Left and right controller states, including unavailable sides."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    left: Controller = Field(default_factory=Controller)
+    right: Controller = Field(default_factory=Controller)
 
 
 class CameraIntrinsics(BaseModel):
