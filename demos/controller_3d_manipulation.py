@@ -1,8 +1,8 @@
-"""Move, rotate, and scale a duck by squeezing both Quest controller grips.
+"""Move, rotate, and scale a duck using both Quest index-finger triggers.
 
-Release both grips at startup and after tracking loss, then squeeze both to grab.
+Release both triggers at startup and after tracking loss, then press both to grab.
 Move both controllers to translate, turn their connecting line to rotate, and
-spread them apart to scale. Release either grip to leave the duck in place.
+spread them apart to scale. Release either trigger to leave the duck in place.
 Requires a Quest client with the controllers executor.
 """
 
@@ -28,12 +28,12 @@ def manipulate(xr: SyncXR, duck: Element) -> None:
                 initial = None
                 continue
 
-            if left.grip <= 0.2 and right.grip <= 0.2:
+            if left.trigger <= 0.2 and right.trigger <= 0.2:
                 armed = True
-            if left.grip <= 0.2 or right.grip <= 0.2:
+            if left.trigger <= 0.2 or right.trigger <= 0.2:
                 initial = None
                 continue
-            if not armed or (initial is None and min(left.grip, right.grip) < 0.8):
+            if not armed or (initial is None and min(left.trigger, right.trigger) < 0.8):
                 continue
 
             vector = left.grip_pose.position - right.grip_pose.position

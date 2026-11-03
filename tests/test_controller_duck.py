@@ -17,11 +17,11 @@ demo = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(demo)
 
 
-def sample(grip=0, *, left=(1, 0, 0), right=(-1, 0, 0), **invalid):
+def sample(trigger=0, *, left=(1, 0, 0), right=(-1, 0, 0), grip=0, **invalid):
     return {"controllers": Controllers(
-        left=Controller(connected=True, tracked=True, grip=grip,
+        left=Controller(connected=True, tracked=True, trigger=trigger, grip=grip,
                         grip_pose=Pose(position=Vector3(*left))),
-        right=Controller(**dict(dict(connected=True, tracked=True, grip=grip,
+        right=Controller(**dict(dict(connected=True, tracked=True, trigger=trigger, grip=grip,
                                     grip_pose=Pose(position=Vector3(*right))), **invalid)),
     )}
 
@@ -75,6 +75,22 @@ class TestControllerDuck(unittest.TestCase):
         np.testing.assert_allclose(tuple(updates[-1].transform.scale), (2, 2, 2))
         rotated = updates[-1].transform.rotation.rotate_vector(Vector3.right())
         np.testing.assert_allclose(tuple(rotated), (0, 1, 0), atol=1e-6)
+
+    def test_grips_do_not_grab(self):
+        self.assertEqual(self.replay([sample(), sample(grip=1)]), [])
+
+    def test_both_triggers_required_and_either_release_stops(self):
+        for side in ("left", "right"):
+            with self.subTest(side=side):
+                released = sample(1)
+                controllers = released["controllers"]
+                released["controllers"] = controllers.model_copy(update={
+                    side: getattr(controllers, side).model_copy(update={"trigger": 0}),
+                })
+                updates = self.replay([
+                    sample(), released, sample(1), released, released,
+                ])
+                self.assertEqual(len(updates), 1)
 
     def test_startup_and_tracking_recovery_require_release(self):
         for invalid in ({"tracked": False}, {"connected": False}, {"grip_pose": None}):
