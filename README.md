@@ -7,15 +7,12 @@ XARP is a Python toolkit for extended reality. It replaces lengthy build-deploy 
 [duck]: ./demos/asset_types.py
 [video]: ./demos/asset_types.py
 [video-feed]: ./demos/video_feed.py
-[controller-brush]: ./demos/controller_brush.py
 
-| [<img src="https://github.com/user-attachments/assets/630a5fe5-3dcc-45d1-85d2-6541338eb31a" width="300" alt="Hand gestures demo"/>][brush] | [<img src="https://github.com/user-attachments/assets/7d821a41-1637-481a-9102-82a027d8b948" width="300" alt="GLB models demo"/>][duck] |
+| [<img src="https://github.com/user-attachments/assets/630a5fe5-3dcc-45d1-85d2-6541338eb31a" width="300"/>][brush] | [<img src="https://github.com/user-attachments/assets/7d821a41-1637-481a-9102-82a027d8b948" width="300"/>][duck] |
 |:---:|:---:|
 | Hand Gestures | GLB Models |
-| [<img src="https://github.com/user-attachments/assets/e6b5ea80-2d6d-461d-a3d3-8cac555de865" width="300" alt="Video player demo"/>][video] | [<img src="https://github.com/user-attachments/assets/d89ebd3d-8b2f-4dc5-8b2d-ddcf57f2a3d1" width="300" alt="Depth images demo"/>][video-feed] |
+| [<img src="https://github.com/user-attachments/assets/e6b5ea80-2d6d-461d-a3d3-8cac555de865" width="300"/>][video] | [<img src="https://github.com/user-attachments/assets/d89ebd3d-8b2f-4dc5-8b2d-ddcf57f2a3d1" width="300"/>][video-feed] |
 | Video Player | Depth Images |
-| [<img src="./controller_brush.gif" width="300" alt="Drawing in 3D with Quest controllers"/>][controller-brush] | <img src="./new%20camera%21%21.gif" width="300" alt="Hand-controlled camera demo"/> |
-| 3D Drawing with Controllers | Hand-Controlled Camera |
 
 ## Built with XARP
 ### UCSB W26 CMPSC 291I
