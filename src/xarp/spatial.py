@@ -32,7 +32,21 @@ class _Vector(RootModel[list[float]]):
             super().__init__(**kwargs)
 
     def model_post_init(self, __context: Any) -> None:
-        self._arr = np.array(self.root, dtype=np.float64)
+        object.__setattr__(self, "_arr", np.array(self.root, dtype=np.float64))
+
+    def __copy__(self) -> Self:
+        copied = super().__copy__()
+        object.__setattr__(copied, "_arr", self._arr)
+        return copied
+
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
+        copied = super().__deepcopy__(memo)
+        object.__setattr__(copied, "_arr", self._arr.copy())
+        return copied
+
+    # ------------------------------------------------------------------
+    # Named component accessors
+    # ------------------------------------------------------------------
 
     @property
     def x(self) -> float:
@@ -279,7 +293,54 @@ class Vector4(_Vector):
     Serializes as a plain array: [x, y, z, w]
     """
 
-    _components = ("x", "y", "z", "w")
+    model_config = {"frozen": True}
+
+    __slots__ = ("_arr",)
+
+    # ------------------------------------------------------------------
+    # Construction
+    # ------------------------------------------------------------------
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        if args and not kwargs:
+            if len(args) == 4:
+                super().__init__(root=[float(args[0]), float(args[1]), float(args[2]), float(args[3])])
+            elif len(args) == 1:
+                seq = args[0]
+                if hasattr(seq, "__len__") and len(seq) != 4:
+                    raise ValueError(f"Expected 4 components, got {len(seq)}")
+                super().__init__(root=[float(seq[0]), float(seq[1]), float(seq[2]), float(seq[3])])
+            else:
+                raise ValueError(f"Expected 1 or 4 positional arguments, got {len(args)}")
+        elif {"x", "y", "z", "w"} <= kwargs.keys():
+            super().__init__(root=[float(kwargs["x"]), float(kwargs["y"]), float(kwargs["z"]), float(kwargs["w"])])
+        else:
+            super().__init__(**kwargs)
+
+    def model_post_init(self, __context: Any) -> None:
+        object.__setattr__(self, "_arr", np.array(self.root, dtype=np.float64))
+
+    def __copy__(self) -> Self:
+        copied = super().__copy__()
+        object.__setattr__(copied, "_arr", self._arr)
+        return copied
+
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
+        copied = super().__deepcopy__(memo)
+        object.__setattr__(copied, "_arr", self._arr.copy())
+        return copied
+
+    # ------------------------------------------------------------------
+    # Named component accessors
+    # ------------------------------------------------------------------
+
+    @property
+    def x(self) -> float:
+        return self.root[0]
+
+    @property
+    def y(self) -> float:
+        return self.root[1]
 
     @property
     def z(self) -> float:
@@ -327,6 +388,16 @@ class Quaternion(RootModel[list[float]]):
 
     def model_post_init(self, __context: Any) -> None:
         object.__setattr__(self, "_arr", np.array(self.root, dtype=np.float64))
+
+    def __copy__(self) -> Self:
+        copied = super().__copy__()
+        object.__setattr__(copied, "_arr", self._arr)
+        return copied
+
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
+        copied = super().__deepcopy__(memo)
+        object.__setattr__(copied, "_arr", self._arr.copy())
+        return copied
 
     # ------------------------------------------------------------------
     # Named component accessors

@@ -53,6 +53,21 @@ class TestConstruction(unittest.TestCase):
         t.scale = Vector3(2.0, 2.0, 2.0)
         assert_vec3_close(self, t.scale, Vector3(2.0, 2.0, 2.0))
 
+    def test_deep_copy_preserves_array_backed_fields(self):
+        original = Transform(
+            position=Vector3(1.0, 2.0, 3.0),
+            rotation=Quaternion.from_euler_angles(30.0, 45.0, 60.0),
+            scale=Vector3(2.0, 3.0, 4.0),
+        )
+        copied = original.model_copy(deep=True)
+
+        self.assertEqual(copied.position - Vector3.zero(), Vector3(1.0, 2.0, 3.0))
+        np.testing.assert_array_equal(copied.rotation.to_numpy(), original.rotation.to_numpy())
+        self.assertEqual(copied.scale - Vector3.zero(), Vector3(2.0, 3.0, 4.0))
+        self.assertIsNot(copied.position._arr, original.position._arr)
+        self.assertIsNot(copied.rotation._arr, original.rotation._arr)
+        self.assertIsNot(copied.scale._arr, original.scale._arr)
+
 
 # ===========================================================================
 # 2. to_matrix — scale is incorporated

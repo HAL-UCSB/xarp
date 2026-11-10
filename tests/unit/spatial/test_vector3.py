@@ -126,6 +126,22 @@ class TestImmutability(unittest.TestCase):
         self.assertEqual(v.x, 1.0)
 
 
+class TestCopying(unittest.TestCase):
+    def test_shallow_copy_preserves_numpy_cache(self):
+        original = Vector3(1.0, 2.0, 3.0)
+        copied = original.model_copy()
+
+        self.assertIs(copied._arr, original._arr)
+        self.assertEqual(copied - Vector3.zero(), original)
+
+    def test_deep_copy_has_independent_numpy_cache(self):
+        original = Vector3(1.0, 2.0, 3.0)
+        copied = original.model_copy(deep=True)
+
+        self.assertIsNot(copied._arr, original._arr)
+        self.assertEqual(copied - Vector3.zero(), original)
+
+
 # -----------------------------------------------------------------------
 # Constants
 # -----------------------------------------------------------------------

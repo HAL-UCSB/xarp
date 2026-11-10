@@ -89,6 +89,22 @@ class TestConstruction(unittest.TestCase):
         np.testing.assert_array_equal(arr, [1.0, 2.0, 3.0, 4.0])
 
 
+class TestCopying(unittest.TestCase):
+    def test_shallow_copy_preserves_numpy_cache(self):
+        original = Quaternion.identity()
+        copied = original.model_copy()
+
+        self.assertIs(copied._arr, original._arr)
+        np.testing.assert_array_equal(copied.to_matrix(), original.to_matrix())
+
+    def test_deep_copy_has_independent_numpy_cache(self):
+        original = Quaternion.identity()
+        copied = original.model_copy(deep=True)
+
+        self.assertIsNot(copied._arr, original._arr)
+        np.testing.assert_array_equal(copied.to_matrix(), original.to_matrix())
+
+
 # ===========================================================================
 # 2. Conversion
 # ===========================================================================
