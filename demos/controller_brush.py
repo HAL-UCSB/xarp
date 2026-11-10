@@ -6,23 +6,21 @@ Python API (following xr.hands() / xr.sense(hands=True)):
     controllers = frame["controllers"]
 
 Model: Controllers(left, right).
-Each side always exists, even when unavailable, with:
-    tracked: bool
-    grip_pose: Pose | None       # valid when tracked
+Each side is None when untracked. A tracked controller has:
+    pose: Pose                   # world-space controller pose
     trigger: float              # normalized 0..1
     grip: float                 # normalized squeeze, 0..1
-    thumbstick: tuple[float, float]  # each axis -1..1
+    thumbstick: Vector2          # each axis -1..1
     buttons.primary: bool       # X on left, A on right
     buttons.secondary: bool     # Y on left, B on right
 
 Buttons report current held state. The demo detects a clear press locally
-when the left primary button changes from released to pressed. A disconnected
-left controller is treated as released; its button does not require a valid pose.
+when the left primary button changes from released to pressed in tracked samples.
 With rt=True, intermediate samples may be dropped: brief button presses or
 tracking interruptions between delivered samples can be missed. Reliable event
 delivery is not provided by this sampling API.
 
-The Quest client converts grip poses into the world space used by scene elements.
+The Quest client converts controller poses into scene world space.
 Release the right trigger once at startup and after tracking loss to arm drawing.
 Press the left X button to clear all scene elements.
 """
@@ -61,17 +59,17 @@ def app(xr: SyncXR, *args, **kwargs) -> None:
             controllers: Controllers = frame["controllers"]
             left, right = controllers.left, controllers.right
 
-            clear_pressed = left.buttons.primary
+            clear_pressed = left is not None and left.buttons.primary
             clear_now = clear_pressed and not clear_was_pressed
-            clear_was_pressed = clear_pressed
+            if left is not None:
+                clear_was_pressed = clear_pressed
             if clear_now:
                 # Like the original hand demo, clear all scene elements.
                 xr.destroy_element(all_elements=True)
                 i = 0
                 cursor_visible = False
 
-            valid = right.tracked and right.grip_pose is not None
-            if not valid:
+            if right is None:
                 armed = drawing = False
                 if cursor_visible:
                     brush.active = False
@@ -80,7 +78,7 @@ def app(xr: SyncXR, *args, **kwargs) -> None:
                 continue
 
             brush.active = True
-            brush.transform.position = right.grip_pose.position
+            brush.transform.position = right.pose.position
             xr.update(brush)
             cursor_visible = True
 
@@ -94,7 +92,7 @@ def app(xr: SyncXR, *args, **kwargs) -> None:
             # drawing resumes next frame, even while the clear button is held.
             if drawing and not clear_now:
                 paint.key = f"paint_{i}"
-                paint.transform.position = right.grip_pose.position
+                paint.transform.position = right.pose.position
                 xr.update(paint)
                 i += 1
     finally:
