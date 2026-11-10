@@ -38,7 +38,7 @@ class ControllerButtons(BaseModel):
 
 
 class Controller(BaseModel):
-    """One controller sample. Use grip_pose only when connected and tracked.
+    """One controller sample. Use grip_pose only when tracked.
 
     Buttons do not require tracking. Pose space and units must match the scene;
     the Quest capture implementation must establish that conversion.
@@ -46,7 +46,6 @@ class Controller(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    connected: bool = False
     tracked: bool = False
     grip_pose: Pose | None = None
     trigger: float = Field(default=0.0, ge=0.0, le=1.0)

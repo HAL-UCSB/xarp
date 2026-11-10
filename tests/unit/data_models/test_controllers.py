@@ -12,7 +12,6 @@ class TestControllers(unittest.TestCase):
     def test_unavailable_defaults(self):
         controllers = Controllers()
         for side in (controllers.left, controllers.right):
-            self.assertFalse(side.connected)
             self.assertFalse(side.tracked)
             self.assertIsNone(side.grip_pose)
             self.assertEqual((side.trigger, side.grip), (0.0, 0.0))
@@ -23,9 +22,9 @@ class TestControllers(unittest.TestCase):
 
     def test_parse_representative_payload_and_round_trip(self):
         payload = {
-            "left": {"connected": True, "tracked": False,
+            "left": {"tracked": False,
                      "grip_pose": None, "buttons": {"primary": True}},
-            "right": {"connected": True, "tracked": True,
+            "right": {"tracked": True,
                       "grip_pose": {"position": [1, 2, 3],
                                     "rotation": [0, 0, 0, 1]},
                       "trigger": 0.8, "grip": 0.5,
@@ -46,8 +45,8 @@ class TestControllers(unittest.TestCase):
         self.assertEqual(Controllers.model_validate_json(controllers.model_dump_json()),
                          controllers)
 
-    def test_connected_controller_can_have_missing_pose(self):
-        controller = Controller(connected=True, tracked=True, grip_pose=None)
+    def test_tracked_controller_can_have_missing_pose(self):
+        controller = Controller(tracked=True, grip_pose=None)
         self.assertIsNone(controller.grip_pose)
 
     def test_analog_boundaries(self):

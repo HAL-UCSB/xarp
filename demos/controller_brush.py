@@ -7,9 +7,8 @@ Python API (following xr.hands() / xr.sense(hands=True)):
 
 Model: Controllers(left, right).
 Each side always exists, even when unavailable, with:
-    connected: bool
     tracked: bool
-    grip_pose: Pose | None       # valid when connected and tracked
+    grip_pose: Pose | None       # valid when tracked
     trigger: float              # normalized 0..1
     grip: float                 # normalized squeeze, 0..1
     thumbstick: tuple[float, float]  # each axis -1..1
@@ -62,7 +61,7 @@ def app(xr: SyncXR, *args, **kwargs) -> None:
             controllers: Controllers = frame["controllers"]
             left, right = controllers.left, controllers.right
 
-            clear_pressed = left.connected and left.buttons.primary
+            clear_pressed = left.buttons.primary
             clear_now = clear_pressed and not clear_was_pressed
             clear_was_pressed = clear_pressed
             if clear_now:
@@ -71,7 +70,7 @@ def app(xr: SyncXR, *args, **kwargs) -> None:
                 i = 0
                 cursor_visible = False
 
-            valid = right.connected and right.tracked and right.grip_pose is not None
+            valid = right.tracked and right.grip_pose is not None
             if not valid:
                 armed = drawing = False
                 if cursor_visible:

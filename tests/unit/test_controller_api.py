@@ -5,7 +5,10 @@ import threading
 from types import SimpleNamespace
 import unittest
 
+from pydantic import ValidationError
+
 from xarp.commands import ResponseMode
+from xarp.commands.sensing import ControllersCommand
 from xarp.data_models import Controllers, Hands
 from xarp.express import AsyncXR, SyncXR
 
@@ -18,7 +21,7 @@ class FakeRemote:
 
     async def execute(self, bundle):
         self.bundles.append(bundle)
-        payloads = [{"right": {"connected": True, "trigger": 0.8}}
+        payloads = [{"right": {"trigger": 0.8}}
                     if cmd.cmd == "controllers" else {}
                     for cmd in bundle.cmds]
         if bundle.mode == ResponseMode.SINGLE:
@@ -34,6 +37,20 @@ class FakeRemote:
                 self.closed = True
 
         return stream()
+
+
+class TestControllersCommand(unittest.TestCase):
+    def test_serialized_command_name(self):
+        command = ControllersCommand()
+        self.assertEqual(command.model_dump(), {"cmd": "controllers"})
+        with self.assertRaises(ValidationError):
+            ControllersCommand(cmd="hands")
+        with self.assertRaises(ValidationError):
+            command.cmd = "hands"
+
+    def test_invalid_response_is_rejected(self):
+        with self.assertRaises(ValidationError):
+            ControllersCommand().validate_response_value(None)
 
 
 class TestAsyncControllerAPI(unittest.IsolatedAsyncioTestCase):
