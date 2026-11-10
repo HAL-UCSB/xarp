@@ -21,7 +21,7 @@ class FakeRemote:
 
     async def execute(self, bundle):
         self.bundles.append(bundle)
-        payloads = [{"left": None, "right": {"pose": {}, "trigger": 0.8}}
+        payloads = [{"right": {"trigger": 0.8}}
                     if cmd.cmd == "controllers" else {}
                     for cmd in bundle.cmds]
         if bundle.mode == ResponseMode.SINGLE:

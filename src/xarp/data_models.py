@@ -1,9 +1,9 @@
-from typing import Any, Tuple
+from typing import Annotated, Any, Tuple
 
 import numpy as np
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 
-from .spatial import Pose, Vector2, Vector3
+from .spatial import Pose, Vector3
 
 
 class Hands(BaseModel):
@@ -38,31 +38,32 @@ class ControllerButtons(BaseModel):
 
 
 class Controller(BaseModel):
-    """One tracked controller sample with a pose in scene coordinates."""
+    """One controller sample. Use grip_pose only when tracked.
+
+    Buttons do not require tracking. Pose space and units must match the scene;
+    the Quest capture implementation must establish that conversion.
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    pose: Pose
+    tracked: bool = False
+    grip_pose: Pose | None = None
     trigger: float = Field(default=0.0, ge=0.0, le=1.0)
     grip: float = Field(default=0.0, ge=0.0, le=1.0)
-    thumbstick: Vector2 = Field(default_factory=Vector2.zero)
+    thumbstick: tuple[
+        Annotated[float, Field(ge=-1.0, le=1.0)],
+        Annotated[float, Field(ge=-1.0, le=1.0)],
+    ] = (0.0, 0.0)
     buttons: ControllerButtons = Field(default_factory=ControllerButtons)
-
-    @field_validator("thumbstick")
-    @classmethod
-    def _validate_thumbstick(cls, value: Vector2) -> Vector2:
-        if any(not -1.0 <= axis <= 1.0 for axis in value):
-            raise ValueError("Thumbstick axes must be between -1 and 1")
-        return value
 
 
 class Controllers(BaseModel):
-    """Left and right controller samples. Untracked sides are None."""
+    """Left and right controller states, including unavailable sides."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    left: Controller | None = None
-    right: Controller | None = None
+    left: Controller = Field(default_factory=Controller)
+    right: Controller = Field(default_factory=Controller)
 
 
 class CameraIntrinsics(BaseModel):

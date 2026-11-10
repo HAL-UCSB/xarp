@@ -181,8 +181,8 @@ class AsyncXR:
     async def controllers(self) -> Controllers:
         """Return controller states. Requires a client with controller support.
 
-        An untracked side is None. Tracked samples include the pose and
-        current held button states.
+        Use grip poses only when tracked and non-null. Buttons
+        report current held states and do not require a tracked pose.
         """
         return await self._execute_single(ControllersCommand())
 
