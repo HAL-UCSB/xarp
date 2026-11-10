@@ -3,7 +3,7 @@ from typing import Any, Tuple
 import numpy as np
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 
-from .spatial import Pose, Vector3
+from .spatial import Pose, Vector2, Vector3
 
 
 class Hands(BaseModel):
@@ -26,6 +26,43 @@ class Hands(BaseModel):
         elif side == "right":
             return self.right
         raise KeyError(f"Expected 'left' or 'right', got {side!r}")
+
+
+class ControllerButtons(BaseModel):
+    """Current held states: primary is X/A, secondary is Y/B (left/right)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    primary: bool = False
+    secondary: bool = False
+
+
+class Controller(BaseModel):
+    """One tracked controller sample with a pose in scene coordinates."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    pose: Pose
+    trigger: float = Field(default=0.0, ge=0.0, le=1.0)
+    grip: float = Field(default=0.0, ge=0.0, le=1.0)
+    thumbstick: Vector2 = Field(default_factory=Vector2.zero)
+    buttons: ControllerButtons = Field(default_factory=ControllerButtons)
+
+    @field_validator("thumbstick")
+    @classmethod
+    def _validate_thumbstick(cls, value: Vector2) -> Vector2:
+        if any(not -1.0 <= axis <= 1.0 for axis in value):
+            raise ValueError("Thumbstick axes must be between -1 and 1")
+        return value
+
+
+class Controllers(BaseModel):
+    """Left and right controller samples. Untracked sides are None."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    left: Controller | None = None
+    right: Controller | None = None
 
 
 class CameraIntrinsics(BaseModel):
