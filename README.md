@@ -14,7 +14,7 @@ XARP is a Python toolkit for extended reality. It replaces lengthy build-deploy 
 | Hand Gestures | GLB Models |
 | [<img src="https://github.com/user-attachments/assets/e6b5ea80-2d6d-461d-a3d3-8cac555de865" width="300" alt="Video player demo"/>][video] | [<img src="https://github.com/user-attachments/assets/d89ebd3d-8b2f-4dc5-8b2d-ddcf57f2a3d1" width="300" alt="Depth images demo"/>][video-feed] |
 | Video Player | Depth Images |
-| [<img src="./docs/demo-previews/controller_brush.gif" width="300" alt="Drawing in 3D with Quest controllers"/>][controller-brush] | <img src="./docs/demo-previews/new%20camera%21%21.gif" width="300" alt="Hand-controlled camera demo"/> |
+| [<img src="./docs/demo-previews/controller-brush.gif" width="300" alt="Drawing in 3D with Quest controllers"/>][controller-brush] | <img src="./docs/demo-previews/hand-controlled-camera.gif" width="300" alt="Hand-controlled camera demo"/> |
 | 3D Drawing with Controllers | Hand-Controlled Camera |
 
 ## Built with XARP
